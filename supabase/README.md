@@ -1,0 +1,106 @@
+# Supabase kurulumu
+
+1. Supabase Dashboard > SQL Editor'a `schema.sql` dosyasinin tamamini yapistirip calistirin.
+2. Sanal portfoy tablolarini kurmak icin `portfolio-migration.sql` dosyasinin tamamini calistirin.
+3. Bekleyen emirler ve emir izleme RPC'leri icin `portfolio-orders-migration.sql` dosyasinin tamamini calistirin.
+4. Grafik alarmlarinda sona erme, tekrar araligi ve tetiklenme gunlugu icin `price-alerts-lifecycle-migration.sql` dosyasini calistirin.
+5. Yeni oluşturulan ve düzenlenen fiyat alarmlarında yanlış yönde/önceden aşılmış hedefleri engellemek ve izleyicide fiyat geçişi doğrulaması yapmak için `price-alert-crossing-guard-migration.sql` dosyasını çalıştırın.
+6. Bekleyen emirleri duzenleyebilmek ve degisiklikleri gunluge kaydetmek icin `portfolio-order-management-migration.sql` dosyasini calistirin.
+7. Bekleyen alis emirlerinde nakit, satis emirlerinde pozisyon adedi rezervasyonu icin `portfolio-order-reservations-migration.sql` dosyasini calistirin. Migration mevcut bekleyen emirlerin toplam rezervasyonunu kontrol eder; bakiye veya pozisyon yetmiyorsa hicbir emri degistirmeden acik hata verir. Fazla bekleyen emirleri iptal/guncelleyip migration'i yeniden calistirin.
+8. Bekleyen emirlere son kullanma suresi eklemek icin `portfolio-order-expiry-migration.sql` dosyasini calistirin. Bu adim rezervasyon migration'inden sonra uygulanmalidir. Yeni emirlerde varsayilan sure 30 gundur; sure secenekleri 1 saat, 1 gun, 7 gun, 30 gun ve suresizdir. Mevcut emirler geriye donuk iptal edilmez ve bitis zamani NULL oldugundan suresiz kalir.
+9. Rol/RBAC, Trader Rank ve gizlilik varsayilani kapali liderlik tablosu icin `user-roles-rank-migration.sql` dosyasini, onceki profil/portfoy/emir/alarm migration'larindan sonra calistirin. Ardindan `leaderboard-gain-visibility-migration.sql` dosyasini çalıştırın; TL kazanç tutarını ayrı izinle ve varsayılan kapalı olarak yayımlar.
+9a. Gizlilik tercihleri etkin olsa da oturum açan kullanıcının kendi liderlik getirisi ve kazanç tutarını görebilmesi, kendi profili liderlikten gizliyse kişisel satırını sıralamaya katılmadan görebilmesi ve yönetici rolünün tüm profilleri görmesi için `leaderboard-owner-privacy-migration.sql` dosyasını `virtual-balance-requests-migration.sql` sonrasında çalıştırın.
+9b. Gizli profil sahibinin kendi gerçek liderlik sırasını görebilmesi için `leaderboard-owner-rank-migration.sql` dosyasını `leaderboard-owner-privacy-migration.sql` sonrasında çalıştırın. Liderlik tablosundaki ek sıralama seçenekleri (getiri, kazanç ve Rank XP) ayrıca veritabanı değişikliği gerektirmez.
+10. Herkese özgü kullanıcı adı alanini eklemek ve eski profilleri otomatik doldurmak icin `username-migration.sql` dosyasini calistirin. İsimler küçük harfli kullanıcı adlarına çevrilir; sonraki değişikliklerde 3–24 karakter, `a-z`, `0-9` ve `_` kabul edilir. Kullanıcı adı benzersizliği veritabanında harf duyarsız olarak zorlanır.
+11. Sistem bildirimleri, duyuru kitle secimi, otomatik olay bildirimleri ve okundu bilgisi icin `notifications-migration.sql` dosyasini calistirin.
+12. Alarm bildirimlerinde hedef ve tetikleme fiyatini küsuratli ve acik gostermek icin `price-alert-notification-precision-migration.sql` dosyasini `notifications-migration.sql` sonrasinda calistirin. Ardindan `notification-price-fraction-migration.sql` dosyasini calistirin; bu migration alış/satış ve emir bildirimlerine birim fiyatı ekler ve tüm fiyat bildirimlerinde en az iki ondalık haneyi korur.
+13. Bildirimlerin tekli, seçili çoklu ve tümünü silme işlemlerine izin vermek için `notification-delete-migration.sql` dosyasını `notifications-migration.sql` sonrasında çalıştırın.
+14. Kullanıcının bildirim türü izinlerini yönetmesi ve izin seçeneklerinin aktif bildirim şablonlarından otomatik türemesi için `notification-preferences-migration.sql` dosyasını `notifications-migration.sql` sonrasında çalıştırın. Daha sonra `notification-preference-copy-migration.sql` dosyasını çalıştırarak yeni kayıt hoş geldin metnini güncelleyin. İzin ekranında şablon kodları yerine olayın kullanıcıya dönük açıklaması gösterilir.
+14a. Super Admin'in kullanıcı bakiyesine doğrudan yaptığı yükleme/düşüm işlemlerinde işlem tutarı, yeni bakiye ve açıklamayla kullanıcı bildirimi göndermek için `admin-balance-adjustment-notification-migration.sql` dosyasını `virtual-balance-requests-migration.sql` ve `notification-preferences-migration.sql` sonrasında çalıştırın. Bildirim tercihlerinde olay türü ayrıca yönetilebilir.
+15. BİST sürekli işlem saatleri, seans dışı işlem engeli, fiyat adımları, sıfır komisyon/kayma kayıtları ve yönetilebilir tatil/özel seans takvimi için `virtual-trading-market-rules-migration.sql` dosyasını çalıştırın. Bu migration bildirim fonksiyonlarını kullandığı için `notifications-migration.sql` sonrasında uygulanmalıdır. Bekleyen emirlerde seans/fiyat verisi nedeniyle geçici gerçekleşmeme nedenlerini göstermek için `portfolio-order-attempt-reasons-migration.sql` dosyasını; fiyat adımı doğrulamasını ondalık hassasiyetiyle uyumlu hale getirmek için `bist-price-tick-validation-fix-migration.sql` dosyasını ardından çalıştırın.
+16. Ilk super admin'i atamak icin `admin-bootstrap.sql` dosyasini bir kez calistirin. Dosya `ibrahimhalilalpa@gmail.com` hesabinin mevcut `auth.users` kaydini arar; hesabiniz farkliysa SQL'i calistirmadan once e-posta degerini guncelleyin.
+17. Temel yönetim ekranları doğrulanmış yönetici oturumu ve RBAC migration'ındaki güvenli RPC/RLS kurallarıyla çalışır. Gerçek Auth hesap dondurma/silme ve kullanıcı e-postası listesi için Next.js sunucu ortamında `SUPABASE_SERVICE_ROLE_KEY` ayarlayın. Bu anahtar yalnızca sunucu API rotalarında kullanılır; `NEXT_PUBLIC_` öneki vermeyin ve istemci koduna eklemeyin. Anahtar eksik olduğunda ilgili Auth Admin işlemleri açıkça devre dışı kalır; bakiye, rol ve veri yönetimi oturum/RPC üzerinden çalışmayı sürdürür.
+18. E-posta dogrulama, davet ve parola yenileme baglantilarinin dogru adrese donmesi icin Next.js sunucu ortaminda `NEXT_PUBLIC_APP_URL` degerini tarayicidan erisilebilen kanonik origin olarak tanimlayin (ornegin yerel gelistirmede `http://localhost:3000`, LAN'da `http://<bilgisayarinizin-lan-ip-adresi>:3000`, production'da `https://uygulama-alan-adiniz`). `0.0.0.0` yalnizca sunucunun tum ag arayuzlerinde dinlemesi icin kullanilan bind adresidir; e-posta baglantisi veya `NEXT_PUBLIC_APP_URL` degeri olarak kullanilamaz. Degeri degistirdikten sonra Next.js sunucusunu yeniden baslatin.
+19. Authentication > URL Configuration icinde Site URL degerini ayni kanonik origin yapin. Redirect URLs'a bu origin'in `/auth/callback` adresini ekleyin; ornegin `http://localhost:3000/auth/callback`, LAN icin `http://<bilgisayarinizin-lan-ip-adresi>:3000/auth/callback` ve production icin `https://uygulama-alan-adiniz/auth/callback`.
+20. Authentication > Providers > Email icinde email confirmation'i acik tutun.
+21. E-posta saglayicisi (SMTP) ayarlanmazsa Supabase gelistirme ortaminda kendi test mail servisini kullanabilir; production'da guvenilir bir SMTP saglayicisi tanimlayin.
+
+Trader Rank ders basina 100 XP, aktif gun basina 10 XP ve pozitif toplam getiri yuzde puani basina 100 XP ile hesaplanir. Esikler: 0 Caylak, 500 Analist, 2.000 Ustat, 5.000 Piyasa Yapici. Ilk kurulumda liderlik tablosu tum kullanicilar icin gizlidir; kullanici gorunurlugu Profil sayfasindan acabilir. Public leaderboard ve performans profili gorunurluk izni verilen takma adi, getiri yuzdesi ve rank/XP bilgisini dondurur. TL kazanc tutari diger kullanicilara yalnizca ayrica izin verildiginde gosterilir; hesap sahibi kendi getiri ve kazancini gizlilik tercihinden bagimsiz gorur. Admin ve super admin tum profillerin gizli liderlik alanlarini gorebilir. Bakiye ve e-posta her zaman liderlik tablosu disinda kalir. `leaderboard-gain-visibility-migration.sql` yeni ve mevcut profillerde `leaderboard_gain_visible` degerini varsayilan olarak kapali kurar. `leaderboard-owner-privacy-migration.sql` bu tercihleri kullaniciya kendi hesabinda uygular, gizli kullanicinin kendisine ozel satirini sunar ve yoneticilere tum profilleri gosterir. `leaderboard-owner-rank-migration.sql` gizli profil sahibinin gerçek sırasını yalnızca kendi satırında gösterir; önceki privacy migration'ından sonra çalıştırılmalıdır. `user-roles-rank-migration.sql` portfoy performansini periyotlara gore karsilastirmak icin her gun 00:00 UTC'de snapshot alan `portfolio-performance-daily-snapshot` pg_cron gorevini kurar. Haftalik/aylik siralamanin tam veriyle hesaplanabilmesi icin migration sonrasinda ilgili periyoda yetecek gunluk snapshot'larin birikmesi gerekir.
+
+`SUPABASE_SERVICE_ROLE_KEY` değerini yalnızca sunucu runtime secrets alanında tutun; browser/client koduna veya `NEXT_PUBLIC_` değişkenine koymayın. `user-roles-rank-migration.sql` yeni admin alt modüllerinin RPC'lerini, duyuru ve akademi tablolarını kurar. `/admin` sol sidebar üzerinden genel bakış, kullanıcılar, portföyler, emirler/alarmlar, akademi CRUD'u ve sistem/audit ekranlarına erişilir. Kullanıcı yönetimi tablosunda arama, rol/durum/e-posta doğrulama/kayıt tarihi filtreleri, sıralama, sayfalama ve filtrelenmiş CSV dışa aktarımı vardır; detay ekranı profil, rol/rank, sanal nakit, pozisyon/emir/işlem geçmişi ile hesap durumunu yönetir. Yeni kullanıcı oluşturma güvenli parola daveti gönderir; davet, Auth hesap dondurma ve kalıcı silme için `SUPABASE_SERVICE_ROLE_KEY` gerekir. Kullanıcı rolü ve bakiye değişimleri audit edilir; emir yönetimi yalnızca bekleyen emir iptali/hata işaretlemesine izin verir, işlem gerçekleşti olarak elle yazılamaz.
+
+Sistem duyurularinin baslangic ve bitis zamanlari yonetici tarayicisinin yerel saatinde girilir ve kaydedilmeden once UTC ISO-8601'e cevrilir. Bitis zamani baslangictan ileri olmalidir; bos baslangic hemen yayina alir, bos bitis duyuruyu suresiz tutar. `notifications-migration.sql` duyurulari tum kullanicilara veya tek bir RBAC rolune yonlendirir; alici bildirim satirlari yayim sirasinda olusturulur ve okundu/okunmadi zamani saklanir. Bildirim merkezi kategori filtreleri, okunmamış rozet sayacı, tümünü okundu işaretleme, tekli/toplu silme ve `notification-preferences-migration.sql` ile aktif olay şablonlarından dinamik üretilen kullanıcı bildirim izinleri sunar. Yeni bildirim türleri kullanıcı izin ekranında varsayılan açık görünür; kullanıcı tercih kapattığında yeni olay kaydı üretilmez. Admin Sistem sayfasi duyurulari duzenleme/silme/durdurma, kategori/önem seviyesi ve kitle secimi ile okuyan-okumayan alicilarin listesini gosterir. Ayni migration yeni kullanici kaydi, sanal alis/satis, akademi dersi tamamlama, fiyat alarmi olusturma/tetiklenmesi ve emir olusturma/gerceklesme/iptal/hata/sure dolumu icin yonetilebilir bildirim sablonlari ve veritabani tetikleyicileri kurar. Admin Sistem sayfasinda bu olay sablonlari on tanimli baslik, metin, kategori ve onem seviyesiyle eklenebilir; alanlar kaydetmeden once duzenlenebilir, etkin/pasif yapilabilir ve silinebilir. Sablon alanlari `{{symbol}}`, `{{quantity}}`, `{{price}}`, `{{lesson_id}}`, `{{market_price}}`, `{{target_price}}`, `{{direction}}`, `{{side}}`, `{{order_type}}` ve `{{error}}` degerlerini destekler. Sistem sayfasinda duyurular ilk basta bes kayitla sinirlanir ve daha fazlasi acilabilir; duzenleme genis modal pencerede yapilir. Portföy ve pozisyon tablolarinda basliklar siralama yapar; buyuk listeler sabit yukseklikli kaydirilabilir tablolarda tutulur.
+
+`virtual-trading-market-rules-migration.sql` ile alım/satım yalnızca BİST pay piyasasının hafta içi 10:00–18:00 Türkiye saati sürekli işlem seansında gerçekleşir; hafta sonları otomatik kapalıdır. Açılış/kapanış müzayedeleri simüle edilmez. Tatil, yarım gün ve özel seanslar Admin > Sistem ekranından tarih bazında girilebilir; bildirim seçilirse tüm kullanıcılara piyasa kategorisinde duyuru ve uygulama bildirimi gönderilir. BİST fiyat adımı fiyat kademelerine göre hem işlem hem bekleyen emir kayıtlarında veritabanı seviyesinde doğrulanır; pay emir adetleri tam sayıdır. Sanal alım/satımda komisyon ve kayma tahsil edilmez; her işlem kaydında ikisi de 0,00 TL olarak saklanır ve gösterilir. Migration öncesinden kalan kesirli adetli bekleyen emirler BİST kurallarına uymayabilir; gerçekleşmeden önce iptal edilip tam adetle yeniden oluşturulmalıdır.
+
+Grafik alarmlarinda varsayilan tekrar secenegi tek sefer, varsayilan sona erme suresi 24 saattir. Sure secenekleri 1 saat, 24 saat, 7 gun, 30 gun veya suresiz; tekrar secenekleri tek sefer, 5, 15, 30 veya 60 dakikadir. Tekrarli alarm, secilen sure dolmadan ikinci kez kayit olusturmaz; sure dolunca kosul hala gerceklesiyorsa yeni bir `triggered` gecmis kaydi ekler. Alarm seviyesi mevcut fiyata esitlenemez ve ayni kullanici/hisse/fiyat icin birden fazla aktif alarm bulunamaz. Lifecycle migration'i mevcut ayni-fiyat aktif alarmlardan en eskisini tutar ve digerlerini iptal ederek gecmise kaydeder.
+
+## Sanal portfoy emirleri
+
+1. `portfolio-migration.sql` dosyasini calistirin.
+2. SQL Editor'da `portfolio-orders-migration.sql` dosyasinin tamamini calistirin.
+3. Grafik alarmi yasam dongusu migration'ini da SQL Editor'da calistirin:
+
+   ```text
+   supabase/price-alerts-lifecycle-migration.sql
+   ```
+
+4. Bekleyen emir guncelleme RPC'si ve denetim gecmisi icin SQL Editor'da su migration'i da calistirin:
+
+   ```text
+   supabase/portfolio-order-management-migration.sql
+   ```
+
+5. Bekleyen alimlarda nakit ve satislarda pozisyon adedi rezervasyonu icin SQL Editor'da:
+
+   ```text
+   supabase/portfolio-order-reservations-migration.sql
+   ```
+
+6. Bekleyen emirlere son kullanma suresi ve otomatik iptal eklemek icin SQL Editor'da:
+
+   ```text
+   supabase/portfolio-order-expiry-migration.sql
+   ```
+
+   Varsayilan sure 30 gundur; 1 saat, 1 gun, 7 gun, 30 gun veya suresiz secilebilir. Eski emirler geriye donuk degistirilmez; bitis zamani olmayan mevcut emirler suresiz kalir. Emir duzenlerken sure secimi yapilirsa secilen sure o andan itibaren yeniden baslar.
+
+7. Sure dolumunu isleyebilmesi icin guncel monitor Edge Function'i yeniden deploy edin:
+
+   ```powershell
+   supabase functions deploy portfolio-order-monitor --no-verify-jwt --project-ref "ptbjskzipuazzfdchbfd"
+   ```
+
+8. SQL Editor'da `portfolio-order-monitor-extensions.sql` dosyasinin tamamini calistirarak `pg_cron`, `pg_net` ve `supabase_vault` eklentilerini etkinlestirin. SQL izni/eklenti hatasi alirsaniz Supabase Dashboard > Database > Extensions bolumunde bu uc eklentiyi arayip etkinlestirin.
+9. Guvenli bir rastgele token uretin ve Edge Function secret'i olarak, dogru Supabase projesine ayarlayin:
+
+   ```powershell
+   $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+   $bytes = New-Object byte[] 32
+   $rng.GetBytes($bytes)
+   $token = -join ($bytes | ForEach-Object { $_.ToString('x2') })
+   $rng.Dispose()
+   supabase secrets set "PORTFOLIO_MONITOR_TOKEN=$token" --project-ref "ptbjskzipuazzfdchbfd"
+   ```
+
+10. Supabase Dashboard > Database > Vault'ta `portfolio_order_monitor_token` adiyla yeni secret olusturun. Deger, Edge Function Secrets'taki `PORTFOLIO_MONITOR_TOKEN` ile birebir ayni olmali. Bunlar iki ayri secret alani: yalnizca Edge Function Secrets'a eklemek yeterli degildir. Token'i SQL dosyasina veya sohbete yazmayin/paylasmayin.
+11. SQL Editor'da `portfolio-order-monitor-vault.sql` dosyasinin tamamini calistirin. Bu dosya yalnizca Function URL'sini Vault'a kaydeder; token'i icermemelidir. Sonuc listesinde `portfolio_order_monitor_url` ve `portfolio_order_monitor_token` olmak uzere iki ad gorunmelidir.
+12. Son olarak SQL Editor'da `portfolio-order-monitor-schedule.sql` dosyasinin tamamini calistirip dakikalik cron isini olusturun. Vault onkontrolu eksik kaydin hangisi oldugunu acikca bildirir. Edge Function Secrets'ta bulunmasi Vault'a kaydedildigi anlamina gelmez.
+
+Kurulumun calistigini dogrulamak icin `cron.job` tablosunda `portfolio-order-monitor-every-minute` adli aktif isi ve `cron.job_run_details` tablosunda basarili calisma kayitlarini kontrol edin. Edge Function yanit kodlari `net._http_response` tablosundan incelenebilir. Cron isi yalnizca veritabani/Edge Function projesi aktif oldugu surece uygulama acik olmasa da calisir. Uygulama sunucusu veya kullanici tarayicisinin acik olmasi gerekmez.
+
+`net._http_response` kayitlarinda `404` ve `Requested function was not found` goruluyorsa cron URL'si erisilebilirdir ancak URL'deki Supabase projesinde `portfolio-order-monitor` fonksiyonu deploy edilmemistir veya URL yanlis proje/slug'a isaret ediyordur. Fonksiyonu yukaridaki deploy komutuyla dogru `--project-ref` degerine deploy edin; Vault'taki `portfolio_order_monitor_url` de ayni proje referansini ve `/functions/v1/portfolio-order-monitor` yolunu kullanmalidir.
+
+Monitor once TradingView BIST tarayicisindan sembole ozel guncel fiyati alir; bu basarisiz olursa Yahoo Finance verisini dener. Her iki kaynak da fiyat vermezse emir beklemede kalir ve guncel engel kullaniciya bekleyen emir kartinda gosterilir; sentetik/yedek fiyatla emir calistirilmaz. Seans kapali, fiyat adimi gecersiz veya piyasa verisi alinamiyor durumlari kullaniciya Turkce aciklamayla sunulur; kosullar normale donunce guncel engel temizlenir. Limit alis emirleri fiyat limitin altina/limitine geldiginde, limit satis emirleri limitin uzerine/limitine geldiginde calisir. Kar-al ve zarar-durdur emirleri mevcut uzun pozisyon icin satis emridir. Zincir (OCO) emrinde iki seviyeden hangisi once gorulurse emir o fiyattan calisir. Fiyat dakikada bir kontrol edilir; piyasa acikken veri gecikmesi veya emir kontrol araligi nedeniyle tetik seviyesiyle gerceklesme fiyati farkli olabilir. Bekleyen limit alis emirleri tetik fiyatina gore nakdi rezerve eder; bekleyen satis/kosullu emirler de ilgili pozisyon adedini diger satislardan ayirir. Emir iptal/guncelleme/gerceklesme durumunda rezervasyon atomik olarak serbest kalir veya kullanilir; rezerve nakit/adet piyasa islemlerinde harcanamaz. Portfoy ekraninda kullanilabilir ve rezerve nakit ayri gosterilir. Basarisiz emir aciklamasi Portfoy > Emir Takibi > Emir Gecmisi bolumunde, bekleyen emirlerin guncel engeli ise Emir Takibi bolumunde gosterilir.
+
+Portfoy sayfasindaki **Portfoyu sifirla** dugmesi onay sonrasi tum pozisyonlari, bekleyen emirleri, islem gecmisini ve performans kayitlarini siler, bakiyeyi 100.000 TL yapar. Islem geri alinamaz. Portfoy getirisi gunluk, haftalik, aylik ve tum zamanlar icin secilebilir; disaridan eklenen/cikarilan nakit yatirim getirisi sayilmaz.
+
+## Veri modeli
+
+- `watchlists` ve `watchlist_symbols`: kullaniciya ozel favoriler ve calisma listeleri
+- `user_portfolios` ve `user_positions`: kullaniciya ozel sanal portfoy
+- `user_profiles`: kullanici adi, gorunen ad ve profil aciklamasi
+- `user_activity_logs`: hesap guvenligi ve profil hareketleri
+- `user_education_progress`: kullaniciya ozel tamamlanan dersler ve ilerleme yuzdesi
+- RLS politikalari her sorguyu `auth.uid()` ile sinirlar.
+- Yeni kullanici kaydinda trigger otomatik olarak varsayilan listeleri ve 100.000 TL sanal portfoy bakiyesini olusturur.
