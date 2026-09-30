@@ -56,7 +56,7 @@ export async function GET() {
             accountCreatedAt: user.created_at,
             lastSignInAt: user.last_sign_in_at,
             emailVerifiedAt: user.email_confirmed_at,
-            profile: profile ?? { full_name: '', username: '', display_name: '', bio: '', leaderboard_visible: false, leaderboard_gain_visible: false, updated_at: null },
+            profile: profile ?? { full_name: '', username: '', display_name: '', bio: '', leaderboard_visible: true, leaderboard_gain_visible: true, updated_at: null },
             role: roleResult.data?.role ?? 'user',
             rank: rankResult.data,
             leaderboardRank: ((leaderboardResult.data as PublicLeaderboardRow[] | null) ?? [])
@@ -96,10 +96,10 @@ export async function PATCH(request: Request) {
     const bio = typeof body.bio === 'string' ? body.bio.trim() : current?.bio ?? '';
     const leaderboardVisible = typeof body.leaderboardVisible === 'boolean'
         ? body.leaderboardVisible
-        : current?.leaderboard_visible ?? false;
+        : current?.leaderboard_visible ?? true;
     const leaderboardGainVisible = typeof body.leaderboardGainVisible === 'boolean'
         ? body.leaderboardGainVisible
-        : current?.leaderboard_gain_visible ?? false;
+        : current?.leaderboard_gain_visible ?? true;
     if (fullName.length > 120 || bio.length > 280) {
         return NextResponse.json({ error: 'Ad 120, açıklama 280 karakteri aşamaz.' }, { status: 400 });
     }
@@ -107,8 +107,8 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: 'Kullanıcı adı 3–24 karakter olmalı; küçük harfle başlamalı ve yalnızca küçük harf, rakam, alt çizgi içermelidir.' }, { status: 400 });
     }
 
-    const previousLeaderboardVisible = current?.leaderboard_visible ?? false;
-    const previousLeaderboardGainVisible = current?.leaderboard_gain_visible ?? false;
+    const previousLeaderboardVisible = current?.leaderboard_visible ?? true;
+    const previousLeaderboardGainVisible = current?.leaderboard_gain_visible ?? true;
     const { data, error } = await supabase.from('user_profiles').upsert({
         user_id: user.id, full_name: fullName, username, display_name: username, bio,
         leaderboard_visible: leaderboardVisible, leaderboard_gain_visible: leaderboardGainVisible,

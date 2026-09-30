@@ -55,7 +55,7 @@ select id from auth.users
 on conflict (user_id) do nothing;
 
 alter table public.user_profiles
-    add column if not exists leaderboard_visible boolean not null default false,
+    add column if not exists leaderboard_visible boolean not null default true,
     add column if not exists rank_xp_adjustment integer not null default 0
         check (rank_xp_adjustment between -1000000 and 1000000);
 

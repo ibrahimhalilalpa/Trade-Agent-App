@@ -53,6 +53,7 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
     const [notice, setNotice] = useState('');
     const [cashAmount, setCashAmount] = useState('');
     const [cashNote, setCashNote] = useState('');
+    const [rankNote, setRankNote] = useState('');
     const [recoveryLink, setRecoveryLink] = useState('');
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteName, setInviteName] = useState('');
@@ -278,11 +279,12 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
             const response = await fetch(`/api/admin/users/${selectedId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rankXpAdjustment: adjustment }),
+                body: JSON.stringify({ rankXpAdjustment: adjustment, rankNote }),
             });
             const payload = await response.json() as Payload<unknown>;
             if (!response.ok) throw new Error(payload.error ?? 'Trader Rank güncellenemedi.');
-            setNotice('Trader Rank XP düzeltmesi kaydedildi.');
+            setRankNote('');
+            setNotice('Trader Rank güncellendi; bildirim tercihi açıksa kullanıcıya iletildi.');
             await loadUsers();
             await loadDetails(selectedId);
         } catch (cause) {
@@ -401,10 +403,11 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
                         <div className="space-y-2"><label className="text-xs font-semibold text-slate-300">Kullanıcı rolü</label><select disabled={busy} value={details.role} onChange={(event) => void updateRole(event.target.value as Role)} className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white">
                             {choices.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                         </select></div>
+                        <div className="space-y-2"><label htmlFor="admin-rank-note" className="text-xs font-semibold text-slate-300">Rank değişikliği mesajı <span className="font-normal text-slate-500">(isteğe bağlı)</span></label><input id="admin-rank-note" maxLength={180} value={rankNote} onChange={(event) => setRankNote(event.target.value)} placeholder="Kullanıcıya iletilecek kısa not" className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs text-white" /></div>
                         <div className="space-y-2"><label className="text-xs font-semibold text-slate-300">Trader Rank ataması</label><select disabled={busy} value="" onChange={(event) => { if (event.target.value) void updateRank(event.target.value); }} className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white">
                             <option value="">Mevcut: {details.rank.rank} · {details.rank.xp} XP</option>
                             <option value="0">Çaylak (0 XP)</option><option value="500">Analist (500 XP)</option><option value="2000">Üstat (2.000 XP)</option><option value="5000">Piyasa Yapıcı (5.000 XP)</option>
-                        </select><p className="text-[10px] text-slate-500">Atama, otomatik hesaplanan ders/aktiflik/getiri XP’sine yönetici düzeltmesi olarak eklenir.</p></div>
+                        </select><p className="text-[10px] text-slate-500">Atama, otomatik hesaplanan ders/aktiflik/getiri XP’sine yönetici düzeltmesi olarak eklenir. Rank ve XP bilgisi bildirim olarak gönderilir.</p></div>
 
                         {actorRole === 'super_admin' && <form onSubmit={adjustCash} className="space-y-2 border-t border-slate-800 pt-4">
                             <h3 className="flex items-center gap-2 text-sm font-bold text-white"><CircleDollarSign className="h-4 w-4 text-emerald-400" />Sanal bakiye müdahalesi</h3>

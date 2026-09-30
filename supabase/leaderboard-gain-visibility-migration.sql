@@ -1,7 +1,7 @@
 begin;
 
 alter table public.user_profiles
-    add column if not exists leaderboard_gain_visible boolean not null default false;
+    add column if not exists leaderboard_gain_visible boolean not null default true;
 
 drop function if exists public.get_public_leaderboard(text);
 

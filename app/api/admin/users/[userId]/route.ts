@@ -72,7 +72,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ us
     if (context.response) return context.response;
     const { userId } = await params;
     if (!UUID_PATTERN.test(userId)) return NextResponse.json({ error: 'Geçersiz kullanıcı kimliği.' }, { status: 400 });
-    let body: { role?: unknown; rankXpAdjustment?: unknown; displayName?: unknown; fullName?: unknown; bio?: unknown };
+    let body: { role?: unknown; rankXpAdjustment?: unknown; rankNote?: unknown; displayName?: unknown; fullName?: unknown; bio?: unknown };
     try {
         body = await request.json() as typeof body;
     } catch {
@@ -115,11 +115,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ us
     }
     if (body.rankXpAdjustment !== undefined) {
         const adjustment = Number(body.rankXpAdjustment);
+        if (body.rankNote !== undefined && typeof body.rankNote !== 'string') {
+            return NextResponse.json({ error: 'Rank değişikliği mesajı geçersiz.' }, { status: 400 });
+        }
+        const note = typeof body.rankNote === 'string' ? body.rankNote.trim() : '';
         if (!Number.isInteger(adjustment) || adjustment < -1000000 || adjustment > 1000000) {
             return NextResponse.json({ error: 'Trader Rank XP düzeltmesi geçersiz.' }, { status: 400 });
         }
+        if (note.length > 180) {
+            return NextResponse.json({ error: 'Rank değişikliği mesajı en fazla 180 karakter olabilir.' }, { status: 400 });
+        }
         const { error } = await admin.rpc('admin_set_rank_xp_adjustment', {
-            p_actor_id: user.id, p_target_id: userId, p_adjustment: adjustment,
+            p_actor_id: user.id, p_target_id: userId, p_adjustment: adjustment, p_note: note || null,
         });
         if (error) {
             console.error('Admin rank adjustment failed.', error);
