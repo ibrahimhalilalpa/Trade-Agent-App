@@ -33,7 +33,7 @@ const formatTurnover = (value: number) => new Intl.NumberFormat('tr-TR', { style
 
 export default function MarketMovers({ onSelect }: MarketMoversProps) {
     const [quotes, setQuotes] = useState<MarketQuote[]>([]);
-    const [interval, setInterval] = useState<Interval>('5m');
+    const [interval, setInterval] = useState<Interval>('1d');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [provider, setProvider] = useState<'tradingview' | 'fallback' | ''>('');

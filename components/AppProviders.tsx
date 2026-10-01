@@ -1,12 +1,15 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { Moon, Sun, TriangleAlert } from 'lucide-react';
 import { ToastContainer } from 'react-toastify';
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { toast } from 'react-toastify';
 
 type Theme = 'dark' | 'light';
+const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const SESSION_ACTIVITY_KEY_PREFIX = 'trade-agent:last-activity:';
 type ConfirmOptions = { title: string; message: string; confirmLabel?: string; danger?: boolean };
 type PromptOptions = { title: string; message: string; label: string; defaultValue?: string; placeholder?: string; confirmLabel?: string };
 type DialogState =
@@ -43,6 +46,7 @@ export function useAppPreferences() {
 }
 
 export default function AppProviders({ children }: { children: ReactNode }) {
+    const router = useRouter();
     const theme = useSyncExternalStore<Theme>(subscribeToTheme, getThemeSnapshot, () => 'dark');
     const [dialog, setDialog] = useState<DialogState>(null);
     const [promptValue, setPromptValue] = useState('');
@@ -58,6 +62,122 @@ export default function AppProviders({ children }: { children: ReactNode }) {
 
         const client = getSupabaseBrowserClient();
         if (!client) return;
+        let sessionUserId: string | null = null;
+        let logoutInProgress = false;
+        let lastActivityWrite = 0;
+        let volatileLastActivity: number | null = null;
+        let storageWarningShown = false;
+        const getActivityKey = (userId: string) => `${SESSION_ACTIVITY_KEY_PREFIX}${userId}`;
+        const readLastActivity = (userId: string) => {
+            try {
+                const value = window.localStorage.getItem(getActivityKey(userId));
+                if (value === null) return volatileLastActivity;
+                const timestamp = Number(value);
+                if (Number.isFinite(timestamp) && timestamp > 0) return timestamp;
+                console.error('Stored session activity timestamp is invalid.');
+                window.localStorage.removeItem(getActivityKey(userId));
+                return volatileLastActivity;
+            } catch (cause) {
+                console.error('Session activity could not be read from browser storage.', cause);
+                if (!storageWarningShown) {
+                    storageWarningShown = true;
+                    toast.warning('Oturum zaman aşımı tarayıcı depolama izni olmadan yalnızca bu sekmede izlenebilir.');
+                }
+                return volatileLastActivity;
+            }
+        };
+        const writeLastActivity = (userId: string, timestamp: number) => {
+            volatileLastActivity = timestamp;
+            try {
+                window.localStorage.setItem(getActivityKey(userId), String(timestamp));
+            } catch (cause) {
+                console.error('Session activity could not be saved to browser storage.', cause);
+                if (!storageWarningShown) {
+                    storageWarningShown = true;
+                    toast.warning('Oturum zaman aşımı tarayıcı depolama izni olmadan yalnızca bu sekmede izlenebilir.');
+                }
+            }
+        };
+        const expireSession = async (userId: string) => {
+            if (logoutInProgress || sessionUserId !== userId) return;
+            logoutInProgress = true;
+            try {
+                void fetch('/api/profile/activity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ eventType: 'logout' }),
+                }).then((response) => {
+                    if (!response.ok) console.error('Automatic logout activity could not be recorded.', response.status);
+                }).catch((cause: unknown) => console.error('Automatic logout activity could not be recorded.', cause));
+                const { error } = await client.auth.signOut({ scope: 'local' });
+                if (error) throw error;
+                try {
+                    window.localStorage.removeItem(getActivityKey(userId));
+                } catch (cause) {
+                    console.error('Expired session activity marker could not be removed.', cause);
+                }
+                router.replace('/auth?reason=inactive');
+            } catch (cause) {
+                logoutInProgress = false;
+                console.error('Inactive session could not be signed out.', cause);
+                toast.error('Oturum hareketsizlik nedeniyle kapatılamadı. Lütfen manuel olarak çıkış yapın.');
+            }
+        };
+        const recordActivity = (force = false) => {
+            const userId = sessionUserId;
+            if (!userId || logoutInProgress || document.visibilityState !== 'visible') return;
+            const now = Date.now();
+            const lastActivity = readLastActivity(userId);
+            if (lastActivity !== null && now - lastActivity >= SESSION_IDLE_TIMEOUT_MS) {
+                void expireSession(userId);
+                return;
+            }
+            if (!force && now - lastActivityWrite < 60_000) return;
+            writeLastActivity(userId, now);
+            lastActivityWrite = now;
+        };
+        const initializeSessionActivity = (userId: string, signedIn: boolean) => {
+            if (sessionUserId !== userId) {
+                sessionUserId = userId;
+                lastActivityWrite = 0;
+                volatileLastActivity = null;
+            }
+            if (signedIn) {
+                const now = Date.now();
+                writeLastActivity(userId, now);
+                lastActivityWrite = now;
+                return;
+            }
+            recordActivity(true);
+        };
+        const clearSessionActivity = () => {
+            if (sessionUserId) {
+                try {
+                    window.localStorage.removeItem(getActivityKey(sessionUserId));
+                } catch (cause) {
+                    console.error('Session activity marker could not be cleared.', cause);
+                }
+            }
+            volatileLastActivity = null;
+            sessionUserId = null;
+            lastActivityWrite = 0;
+            logoutInProgress = false;
+        };
+        const onActivity = () => recordActivity();
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') recordActivity(true);
+        };
+        const activityEvents: Array<keyof DocumentEventMap> = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'scroll', 'click'];
+        activityEvents.forEach((eventName) => document.addEventListener(eventName, onActivity, { passive: true }));
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        const idleCheck = window.setInterval(() => {
+            const userId = sessionUserId;
+            if (!userId || logoutInProgress) return;
+            const lastActivity = readLastActivity(userId);
+            if (lastActivity !== null && Date.now() - lastActivity >= SESSION_IDLE_TIMEOUT_MS) {
+                void expireSession(userId);
+            }
+        }, 30_000);
         const loadAccountTheme = async (userId: string | null) => {
             const requestId = ++themeRequestId.current;
             currentUserId.current = userId;
@@ -84,16 +204,22 @@ export default function AppProviders({ children }: { children: ReactNode }) {
                 console.error('Current account lookup for theme preference failed.', error);
                 return;
             }
+            if (data.session) initializeSessionActivity(data.session.user.id, false);
             void loadAccountTheme(data.session?.user.id ?? null);
         });
-        const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
+            if (session) initializeSessionActivity(session.user.id, event === 'SIGNED_IN');
+            else clearSessionActivity();
             void loadAccountTheme(session?.user.id ?? null);
         });
         return () => {
             themeRequestId.current += 1;
+            window.clearInterval(idleCheck);
+            activityEvents.forEach((eventName) => document.removeEventListener(eventName, onActivity));
+            document.removeEventListener('visibilitychange', onVisibilityChange);
             subscription.unsubscribe();
         };
-    }, []);
+    }, [router]);
 
     const toggleTheme = useCallback(() => {
         const next: Theme = getThemeSnapshot() === 'dark' ? 'light' : 'dark';

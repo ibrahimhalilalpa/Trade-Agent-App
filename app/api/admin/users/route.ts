@@ -16,10 +16,10 @@ export async function GET() {
     if (context.response) return context.response;
     const { admin, serviceClient } = context;
     if (!serviceClient) {
-        const { data, error } = await admin.rpc('admin_list_users');
+        const { data, error } = await admin.rpc('admin_list_users_with_profile');
         if (error) {
             console.error('Admin user directory RPC failed.', error);
-            return NextResponse.json({ error: 'Kullanıcı listesi yüklenemedi. RBAC migration güncel değil.' }, { status: 503 });
+            return NextResponse.json({ error: 'Kullanıcı listesi yüklenemedi. Topluluk ve RBAC migration dosyalarının güncel olduğunu kontrol edin.' }, { status: 503 });
         }
 
         return NextResponse.json({ success: true, data: data ?? [] });
@@ -38,13 +38,16 @@ export async function GET() {
     const ids = users.map((item) => item.id);
     if (ids.length === 0) return NextResponse.json({ success: true, data: [] });
 
-    const profileRows: Array<{ user_id: string; display_name: string; full_name: string }> = [];
+    const profileRows: Array<{
+        user_id: string; display_name: string; full_name: string; avatar_url: string | null;
+        gender: string; is_profile_public: boolean; leaderboard_visible: boolean; leaderboard_gain_visible: boolean;
+    }> = [];
     const roleRows: Array<{ user_id: string; role: string }> = [];
     const portfolioRows: Array<{ id: string; user_id: string; balance: number }> = [];
     for (let offset = 0; offset < ids.length; offset += 100) {
         const batch = ids.slice(offset, offset + 100);
         const [profiles, roles, portfolios] = await Promise.all([
-            admin.from('user_profiles').select('user_id, display_name, full_name').in('user_id', batch),
+            admin.from('user_profiles').select('user_id, display_name, full_name, avatar_url, gender, is_profile_public, leaderboard_visible, leaderboard_gain_visible').in('user_id', batch),
             admin.from('user_roles').select('user_id, role').in('user_id', batch),
             admin.from('user_portfolios').select('id, user_id, balance').in('user_id', batch),
         ]);
@@ -108,6 +111,11 @@ export async function GET() {
                 emailVerifiedAt: item.email_confirmed_at ?? null,
                 banned: Boolean(item.banned_until && new Date(item.banned_until).getTime() > Date.now()),
                 displayName: profileByUser.get(item.id)?.display_name || profileByUser.get(item.id)?.full_name || '',
+                avatarUrl: profileByUser.get(item.id)?.avatar_url ?? null,
+                gender: profileByUser.get(item.id)?.gender ?? 'unspecified',
+                isProfilePublic: profileByUser.get(item.id)?.is_profile_public ?? true,
+                leaderboardVisible: profileByUser.get(item.id)?.leaderboard_visible ?? true,
+                leaderboardGainVisible: profileByUser.get(item.id)?.leaderboard_gain_visible ?? true,
                 role: roleByUser.get(item.id) ?? 'user',
                 balance: Number(portfolio?.balance ?? 0),
                 portfolioValue: Number(portfolio?.balance ?? 0) + (summary?.positionValue ?? 0),

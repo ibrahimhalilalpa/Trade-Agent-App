@@ -1,6 +1,6 @@
 'use client';
 
-import { Activity, BriefcaseBusiness, Menu, X } from 'lucide-react';
+import { Activity, BriefcaseBusiness, Menu, MessageCircle, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -17,6 +17,7 @@ const LINKS = [
     { href: '/portfolio', label: 'Portföyüm' },
     { href: '/leaderboard', label: 'Liderlik' },
     { href: '/education', label: 'Akademi' },
+    { href: '/forum', label: 'Topluluk' },
 ];
 
 export default function AppNav() {
@@ -45,7 +46,7 @@ export default function AppNav() {
         {menuOpen && <button className="mobile-nav-backdrop" type="button" aria-label="Menüyü kapat" onClick={() => setMenuOpen(false)} />}
         <nav id="primary-navigation" aria-label="Ana gezinme">
             <div className="mobile-nav-heading"><div><span className="ds-eyebrow">TRADE DESK / MENÜ</span><strong>Çalışma alanları</strong></div><button className="mobile-nav-close" type="button" aria-label="Menüyü kapat" onClick={() => setMenuOpen(false)}><X size={18} /></button></div>
-            {links.map(({ href, label }) => { const active = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`); const portfolio = href === '/portfolio'; return <Link key={href} href={href} className={`${active ? 'active ' : ''}${portfolio ? 'portfolio-nav-link' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => setMenuOpen(false)}>{portfolio && <BriefcaseBusiness size={15} aria-hidden="true" />}<span>{label}</span><span className="nav-link-arrow">↗</span></Link>; })}
+            {links.map(({ href, label }) => { const active = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`); const portfolio = href === '/portfolio'; return <Link key={href} href={href} className={`${active ? 'active ' : ''}${portfolio ? 'portfolio-nav-link' : ''}`} aria-current={active ? 'page' : undefined} onClick={() => setMenuOpen(false)}>{portfolio && <BriefcaseBusiness size={15} aria-hidden="true" />}{href === '/forum' && <MessageCircle size={15} aria-hidden="true" />}<span>{label}</span><span className="nav-link-arrow">↗</span></Link>; })}
             <div className="app-nav-inline-controls"><ThemeToggle /><NotificationCenter /></div>
             <div className="mobile-nav-footer"><AuthStatus onNavigate={() => setMenuOpen(false)} /></div>
         </nav>

@@ -1,12 +1,13 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getAuthRedirectUrl } from '@/lib/app-url';
 import { translateAuthError } from '@/lib/auth-errors';
 import { User, ShieldCheck, Activity, KeyRound, CheckCircle2, AlertCircle, Award, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-toastify';
 import WalletBalanceCard from '@/components/WalletBalanceCard';
+import SocialProfileSettings from '@/components/SocialProfileSettings';
 
 type ProfileData = {
     email: string;
@@ -66,6 +67,19 @@ export default function ProfileWorkspace({ recoveryMode = false }: ProfileWorksp
     const [passwordResetBusy, setPasswordResetBusy] = useState(false);
     const [passwordMessage, setPasswordMessage] = useState('');
     const [passwordError, setPasswordError] = useState('');
+
+    const refreshActivity = useCallback(async () => {
+        try {
+            const response = await fetch('/api/profile', { cache: 'no-store' });
+            const payload = await response.json() as { data?: ProfileData; error?: string };
+            if (!response.ok || !payload.data) throw new Error(payload.error ?? 'Hareketler yenilenemedi.');
+            const activity = payload.data.activity;
+            setData((previous) => previous ? { ...previous, activity } : previous);
+        } catch (cause) {
+            console.error('Profile activity could not be refreshed after community profile update.', cause);
+            toast.warning('Profil değişiklikleri kaydedildi ancak Son Hareketler yenilenemedi. Sayfayı yenileyerek tekrar deneyin.');
+        }
+    }, []);
 
     useEffect(() => {
         let active = true;
@@ -290,6 +304,53 @@ export default function ProfileWorkspace({ recoveryMode = false }: ProfileWorksp
     const hasLetter = /[A-Za-z]/.test(newPassword);
     const hasNumber = /\d/.test(newPassword);
     const isMatch = newPassword && newPassword === confirmPassword;
+    const rankPanel = <section className="profile-rank-panel space-y-4 rounded-2xl border border-emerald-500/20 bg-slate-900 p-6 shadow-xl">
+        <div className="flex items-start justify-between gap-3">
+            <div><span className="text-[10px] font-bold tracking-widest text-emerald-400">TRADER RANK</span><h2 className="mt-1 flex items-center gap-2 text-xl font-extrabold text-white"><Award className="h-5 w-5 text-amber-300" />{data?.rank.rank}</h2></div>
+            <span className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">{data ? ROLE_LABELS[data.role] ?? data.role : ''}</span>
+        </div>
+        {data && <>
+            <div className="flex justify-between text-xs"><span className="font-semibold text-slate-200">{data.rank.xp.toLocaleString('tr-TR')} XP</span><span className="text-slate-500">{data.rank.rank === 'Piyasa Yapıcı' ? 'En üst seviye' : `Sonraki seviye: ${data.rank.nextRankXp.toLocaleString('tr-TR')} XP`}</span></div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(100, Math.max(0, data.rank.rankProgress))}%` }} /></div>
+            <div className="grid grid-cols-2 gap-2 text-center text-[10px] sm:grid-cols-4">
+                <div className="rounded-lg bg-slate-950/70 p-2"><strong className="block text-white">{data.rank.completedLessons}</strong><span className="text-slate-500">Tamamlanan ders</span></div>
+                <div className="rounded-lg bg-slate-950/70 p-2"><strong className="block text-white">{data.rank.activeDays}</strong><span className="text-slate-500">Aktif gün</span></div>
+                <div className="rounded-lg bg-slate-950/70 p-2"><strong className={data.rank.pnlPercent >= 0 ? 'block text-emerald-300' : 'block text-rose-300'}>{data.rank.pnlPercent.toFixed(2)}%</strong><span className="text-slate-500">Getiri</span></div>
+                <div className="rounded-lg bg-slate-950/70 p-2"><strong className="block text-white">{leaderboardVisible ? (data.leaderboardRank ? `#${data.leaderboardRank}` : '—') : 'Gizli'}</strong><span className="text-slate-500">Liderlik sırası</span></div>
+            </div>
+            <div className="space-y-3 border-t border-slate-800 pt-4">
+                <div><h3 className="text-xs font-bold text-white">İzinler ve görünürlük</h3><p className="mt-1 text-[10px] text-slate-500">Liderlik paylaşım tercihlerini ve topluluk profilinin görünürlüğünü yönet.</p></div>
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            {leaderboardVisible ? <Eye className="h-4 w-4 text-emerald-400" /> : <EyeOff className="h-4 w-4 text-slate-500" />}
+                            <p className="text-xs font-semibold text-slate-200">Liderlik tablosunda görün</p>
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${leaderboardVisible ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>{leaderboardVisible ? 'Açık' : 'Kapalı'}</span>
+                        </div>
+                        <p className="mt-1.5 text-[11px] leading-4 text-slate-500">Getiri yüzdesi ve trader rütben gösterilir. Bakiye ve e-posta paylaşılmaz.</p>
+                    </div>
+                    <button type="button" role="switch" aria-checked={leaderboardVisible} aria-label="Liderlik tablosunda görünürlük" disabled={visibilitySaving} onClick={() => void saveLeaderboardVisibility(!leaderboardVisible)}
+                        className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ${leaderboardVisible ? 'bg-emerald-600' : 'bg-slate-700'}`}>
+                        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${leaderboardVisible ? 'left-6' : 'left-1'}`} />
+                    </button>
+                </div>
+                <div className={`flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4 transition-opacity ${leaderboardVisible ? '' : 'opacity-70'}`}>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xs font-semibold text-slate-200">Dönem kazanç tutarını TL olarak paylaş</p>
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${leaderboardGainVisible ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>{leaderboardGainVisible ? 'Açık' : 'Kapalı'}</span>
+                        </div>
+                        <p className="mt-1.5 text-[11px] leading-4 text-slate-500">Ayrı ve isteğe bağlı izindir. Liderlik görünürlüğün kapalıyken kazanç tutarı gösterilmez.</p>
+                    </div>
+                    <button type="button" role="switch" aria-checked={leaderboardGainVisible} aria-label="Dönem kazanç tutarını liderlik tablosunda göster" disabled={visibilitySaving || !leaderboardVisible} onClick={() => void saveLeaderboardGainVisibility(!leaderboardGainVisible)}
+                        className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ${leaderboardGainVisible ? 'bg-emerald-600' : 'bg-slate-700'}`}>
+                        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${leaderboardGainVisible ? 'left-6' : 'left-1'}`} />
+                    </button>
+                </div>
+            </div>
+            <div className="border-t border-slate-800 pt-4"><SocialProfileSettings onSaved={refreshActivity} /></div>
+        </>}
+    </section>;
 
     return (
         <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
@@ -497,49 +558,8 @@ export default function ProfileWorkspace({ recoveryMode = false }: ProfileWorksp
                                 </button>}
                             </section>
 
-                            <section className="profile-rank-panel space-y-4 rounded-2xl border border-emerald-500/20 bg-slate-900 p-6 shadow-xl">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div><span className="text-[10px] font-bold tracking-widest text-emerald-400">TRADER RANK</span><h2 className="mt-1 flex items-center gap-2 text-xl font-extrabold text-white"><Award className="h-5 w-5 text-amber-300" />{data.rank.rank}</h2></div>
-                                    <span className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">{ROLE_LABELS[data.role] ?? data.role}</span>
-                                </div>
-                                <div className="flex justify-between text-xs"><span className="font-semibold text-slate-200">{data.rank.xp.toLocaleString('tr-TR')} XP</span><span className="text-slate-500">{data.rank.rank === 'Piyasa Yapıcı' ? 'En üst seviye' : `Sonraki seviye: ${data.rank.nextRankXp.toLocaleString('tr-TR')} XP`}</span></div>
-                                <div className="h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(100, Math.max(0, data.rank.rankProgress))}%` }} /></div>
-                                <div className="grid grid-cols-2 gap-2 text-center text-[10px] sm:grid-cols-4">
-                                    <div className="rounded-lg bg-slate-950/70 p-2"><strong className="block text-white">{data.rank.completedLessons}</strong><span className="text-slate-500">Tamamlanan ders</span></div>
-                                    <div className="rounded-lg bg-slate-950/70 p-2"><strong className="block text-white">{data.rank.activeDays}</strong><span className="text-slate-500">Aktif gün</span></div>
-                                    <div className="rounded-lg bg-slate-950/70 p-2"><strong className={data.rank.pnlPercent >= 0 ? 'block text-emerald-300' : 'block text-rose-300'}>{data.rank.pnlPercent.toFixed(2)}%</strong><span className="text-slate-500">Getiri</span></div>
-                                    <div className="rounded-lg bg-slate-950/70 p-2"><strong className="block text-white">{leaderboardVisible ? (data.leaderboardRank ? `#${data.leaderboardRank}` : '—') : 'Gizli'}</strong><span className="text-slate-500">Liderlik sırası</span></div>
-                                </div>
-                                <div className="space-y-3 border-t border-slate-800 pt-4">
-                                    <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                {leaderboardVisible ? <Eye className="h-4 w-4 text-emerald-400" /> : <EyeOff className="h-4 w-4 text-slate-500" />}
-                                                <p className="text-xs font-semibold text-slate-200">Liderlik tablosunda görün</p>
-                                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${leaderboardVisible ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>{leaderboardVisible ? 'Açık' : 'Kapalı'}</span>
-                                            </div>
-                                            <p className="mt-1.5 text-[11px] leading-4 text-slate-500">Getiri yüzdesi ve trader rütben gösterilir. Bakiye ve e-posta paylaşılmaz.</p>
-                                        </div>
-                                        <button type="button" role="switch" aria-checked={leaderboardVisible} aria-label="Liderlik tablosunda görünürlük" disabled={visibilitySaving} onClick={() => void saveLeaderboardVisibility(!leaderboardVisible)}
-                                            className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ${leaderboardVisible ? 'bg-emerald-600' : 'bg-slate-700'}`}>
-                                            <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${leaderboardVisible ? 'left-6' : 'left-1'}`} />
-                                        </button>
-                                    </div>
-                                    <div className={`flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4 transition-opacity ${leaderboardVisible ? '' : 'opacity-70'}`}>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-xs font-semibold text-slate-200">Dönem kazanç tutarını TL olarak paylaş</p>
-                                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${leaderboardGainVisible ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>{leaderboardGainVisible ? 'Açık' : 'Kapalı'}</span>
-                                            </div>
-                                            <p className="mt-1.5 text-[11px] leading-4 text-slate-500">Ayrı ve isteğe bağlı izindir. Liderlik görünürlüğün kapalıyken kazanç tutarı gösterilmez.</p>
-                                        </div>
-                                        <button type="button" role="switch" aria-checked={leaderboardGainVisible} aria-label="Dönem kazanç tutarını liderlik tablosunda göster" disabled={visibilitySaving || !leaderboardVisible} onClick={() => void saveLeaderboardGainVisibility(!leaderboardGainVisible)}
-                                            className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ${leaderboardGainVisible ? 'bg-emerald-600' : 'bg-slate-700'}`}>
-                                            <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${leaderboardGainVisible ? 'left-6' : 'left-1'}`} />
-                                        </button>
-                                    </div>
-                                </div>
-                            </section>
+                            {rankPanel}
+
                         </div>
 
                         <div className="profile-workspace-column">

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowUpRight, ExternalLink, Heart, RefreshCw, X } from 'lucide-react';
 import DynamicChart from '@/components/DynamicChart';
+import StockForumPanel from '@/components/StockForumPanel';
 import { describeBistPriceStep, getBistPriceStep, isValidBistPriceTick } from '@/lib/bist-market';
 import type { CompanyProfile, MarketData, PortfolioOrder, PortfolioState, PortfolioTrade, PriceAlert, PriceAlertEvent, Timeframe } from '@/lib/types';
 import { showError, showInfo, showSuccess } from '@/lib/ui-alerts';
@@ -605,6 +606,7 @@ export default function StockDetailModal({ symbol, onClose, onAnalyze }: StockDe
                     </div>
                 </div>
                 <p className="company-summary">{profile.summary}</p>
+                <StockForumPanel symbol={symbol} />
 
                 <section className="stock-chart-section">
                     <div className="stock-section-heading"><div><span className="eyebrow">CANLI GRAFİK</span><h3>Fiyat hareketi</h3></div><span className="stock-chart-status"><i className={market?.source === 'yahoo-finance' ? 'source-live' : ''} />{chartLoading ? 'Güncelleniyor' : market?.source === 'yahoo-finance' ? 'Sağlayıcı verisi' : market ? 'Yedek / sentetik veri' : 'Veri bekleniyor'}</span></div>

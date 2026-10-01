@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { isPrivatePreferenceAudit } from '@/lib/privacy-policy';
+import { cleanText, hasProfanity } from '@/lib/profanityFilter';
 
 const PROFILE_SCHEMA_ERROR = 'Profil veritabanı şeması eksik. schema.sql tek başına yeterli değildir: proje kurulum sırasındaki user-roles-rank-migration.sql, username-migration.sql ve leaderboard-gain-visibility-migration.sql dosyalarının da uygulanmış olduğunu doğrulayın.';
 type PublicLeaderboardRow = { user_id: string };
@@ -19,13 +20,23 @@ function isMissingSchema(error: { code?: string; message?: string } | null) {
         || error?.code === 'PGRST204';
 }
 
+function localizeActivityDescription(description: string) {
+    return description
+        .replace(/\bunspecified\b/g, 'belirtmedi')
+        .replace(/\bmale\b/g, 'erkek')
+        .replace(/\bfemale\b/g, 'kadın')
+        .replace(/\bpublic\b/g, 'herkese açık')
+        .replace(/\bfollowers\b/g, 'takipçilere açık')
+        .replace(/\bprivate\b/g, 'yalnızca bana açık');
+}
+
 export async function GET() {
     const { supabase, user } = await getContext();
     if (!supabase) return NextResponse.json({ error: 'Supabase bağlantısı yapılandırılmamış.' }, { status: 503 });
     if (!user) return NextResponse.json({ error: 'Profilini görmek için giriş yapmalısın.' }, { status: 401 });
 
     const [profileResult, roleResult, rankResult, leaderboardResult] = await Promise.all([
-        supabase.from('user_profiles').select('full_name, username, display_name, bio, leaderboard_visible, leaderboard_gain_visible, updated_at').eq('user_id', user.id).maybeSingle(),
+        supabase.from('user_profiles').select('full_name, username, display_name, bio, avatar_url, gender, is_profile_public, leaderboard_visible, leaderboard_gain_visible, updated_at').eq('user_id', user.id).maybeSingle(),
         supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle(),
         supabase.rpc('get_trader_rank', { p_user_id: user.id }),
         supabase.rpc('get_public_leaderboard', { p_period: 'all' }),
@@ -56,7 +67,7 @@ export async function GET() {
             accountCreatedAt: user.created_at,
             lastSignInAt: user.last_sign_in_at,
             emailVerifiedAt: user.email_confirmed_at,
-            profile: profile ?? { full_name: '', username: '', display_name: '', bio: '', leaderboard_visible: true, leaderboard_gain_visible: true, updated_at: null },
+            profile: profile ?? { full_name: '', username: '', display_name: '', bio: '', avatar_url: null, gender: 'unspecified', is_profile_public: true, leaderboard_visible: true, leaderboard_gain_visible: true, updated_at: null },
             role: roleResult.data?.role ?? 'user',
             rank: rankResult.data,
             leaderboardRank: ((leaderboardResult.data as PublicLeaderboardRow[] | null) ?? [])
@@ -67,7 +78,7 @@ export async function GET() {
                 .map((item) => ({
                     id: item.id,
                     event_type: item.event_type,
-                    description: item.description,
+                    description: localizeActivityDescription(item.description),
                     created_at: item.created_at,
                 })),
         }
@@ -106,26 +117,41 @@ export async function PATCH(request: Request) {
     if (!/^[a-z][a-z0-9_]{2,23}$/.test(username)) {
         return NextResponse.json({ error: 'Kullanıcı adı 3–24 karakter olmalı; küçük harfle başlamalı ve yalnızca küçük harf, rakam, alt çizgi içermelidir.' }, { status: 400 });
     }
+    if (hasProfanity(username)) {
+        return NextResponse.json({ error: 'Kullanıcı adı topluluk kurallarına uygun olmayan ifadeler içeremez.' }, { status: 400 });
+    }
+    const safeFullName = cleanText(fullName);
+    const safeBio = cleanText(bio);
 
     const previousLeaderboardVisible = current?.leaderboard_visible ?? true;
     const previousLeaderboardGainVisible = current?.leaderboard_gain_visible ?? true;
     const { data, error } = await supabase.from('user_profiles').upsert({
-        user_id: user.id, full_name: fullName, username, display_name: username, bio,
+        user_id: user.id, full_name: safeFullName, username, display_name: username, bio: safeBio,
         leaderboard_visible: leaderboardVisible, leaderboard_gain_visible: leaderboardGainVisible,
     }, { onConflict: 'user_id' }).select('full_name, username, display_name, bio, leaderboard_visible, leaderboard_gain_visible, updated_at').single();
     if (error?.code === '23505') return NextResponse.json({ error: 'Bu kullanıcı adı başka biri tarafından kullanılıyor.' }, { status: 409 });
     if (error) return NextResponse.json({ error: isMissingSchema(error) ? PROFILE_SCHEMA_ERROR : 'Profil kaydedilemedi.' }, { status: 500 });
 
-    const auditEntries: Array<{ user_id: string; event_type: 'profile_updated'; description: string; metadata: Record<string, boolean> }> = [];
-    const profileChanged = fullName !== (current?.full_name ?? '')
+    const profileChanges: Record<string, { from: string | boolean; to: string | boolean }> = {};
+    const profileChanged = safeFullName !== (current?.full_name ?? '')
         || username !== (current?.username ?? current?.display_name ?? '')
-        || bio !== (current?.bio ?? '');
+        || safeBio !== (current?.bio ?? '');
+    if (username !== (current?.username ?? current?.display_name ?? '')) {
+        profileChanges.username = { from: current?.username ?? current?.display_name ?? '', to: username };
+    }
+    if (safeFullName !== (current?.full_name ?? '')) {
+        profileChanges.full_name_changed = { from: Boolean(current?.full_name), to: Boolean(safeFullName) };
+    }
+    if (safeBio !== (current?.bio ?? '')) {
+        profileChanges.bio_changed = { from: Boolean(current?.bio), to: Boolean(safeBio) };
+    }
+    const auditEntries: Array<{ user_id: string; event_type: 'profile_updated'; description: string; metadata: Record<string, unknown> }> = [];
     if (leaderboardVisible !== previousLeaderboardVisible) {
         auditEntries.push({
             user_id: user.id,
             event_type: 'profile_updated',
             description: `Liderlik tablosu görünürlüğü ${leaderboardVisible ? 'açıldı' : 'kapatıldı'}.`,
-            metadata: { leaderboard_visible: leaderboardVisible },
+            metadata: { changes: { leaderboard_visible: { from: previousLeaderboardVisible, to: leaderboardVisible } } },
         });
     }
     if (leaderboardGainVisible !== previousLeaderboardGainVisible) {
@@ -133,15 +159,15 @@ export async function PATCH(request: Request) {
             user_id: user.id,
             event_type: 'profile_updated',
             description: `Dönem kazanç tutarını paylaşma izni ${leaderboardGainVisible ? 'açıldı' : 'kapatıldı'}.`,
-            metadata: { leaderboard_gain_visible: leaderboardGainVisible },
+            metadata: { changes: { leaderboard_gain_visible: { from: previousLeaderboardGainVisible, to: leaderboardGainVisible } } },
         });
     }
     if (profileChanged || auditEntries.length === 0) {
         auditEntries.push({
             user_id: user.id,
             event_type: 'profile_updated',
-            description: 'Profil bilgileri güncellendi.',
-            metadata: {},
+            description: `Profil bilgileri güncellendi${Object.keys(profileChanges).length ? `: ${Object.keys(profileChanges).map((field) => field === 'username' ? 'kullanıcı adı' : field === 'full_name_changed' ? 'ad soyad' : 'biyografi').join(', ')}` : ''}.`,
+            metadata: { source: 'account_profile', changes: profileChanges },
         });
     }
     if (auditEntries.length > 0) {

@@ -5,7 +5,7 @@ import { ArrowRight, LockKeyhole, LogIn, ShieldCheck, UserPlus } from 'lucide-re
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getAuthRedirectUrl, safeInternalPath } from '@/lib/app-url';
 import { translateAuthError } from '@/lib/auth-errors';
-import { showError, showSuccess } from '@/lib/ui-alerts';
+import { showError, showSuccess, showWarning } from '@/lib/ui-alerts';
 
 type Mode = 'login' | 'signup';
 
@@ -40,6 +40,12 @@ export default function AuthPage() {
     useEffect(() => {
         if (message) showSuccess(message);
     }, [message]);
+
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).get('reason') === 'inactive') {
+            showWarning('30 dakika hareketsizlik nedeniyle güvenliğiniz için oturumunuz kapatıldı.');
+        }
+    }, []);
 
     const submit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();

@@ -1,12 +1,12 @@
 'use client';
 
-import { ArrowLeft, Bell, Check, CheckCheck, CheckSquare, Circle, Info, OctagonAlert, Settings2, Sparkles, Square, Trash2, TrendingUp, X } from 'lucide-react';
+import { ArrowLeft, Bell, Check, CheckCheck, CheckSquare, Circle, Info, MessageCircle, OctagonAlert, Settings2, Sparkles, Square, Trash2, TrendingUp, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { useAppPreferences } from '@/components/AppProviders';
 import { showError, showSuccess } from '@/lib/ui-alerts';
 
-type Category = 'announcement' | 'market' | 'portfolio' | 'academy' | 'system';
+type Category = 'announcement' | 'market' | 'portfolio' | 'academy' | 'system' | 'community';
 type Notification = {
     id: string;
     announcement_id: string | null;
@@ -16,6 +16,7 @@ type Notification = {
     message: string;
     created_at: string;
     read_at: string | null;
+    action_url?: string | null;
 };
 type NotificationPreference = {
     eventKey: string;
@@ -33,12 +34,13 @@ const FILTERS: Array<{ id: CategoryFilter; label: string; icon: typeof Bell }> =
     { id: 'portfolio', label: 'Portföy', icon: Sparkles },
     { id: 'academy', label: 'Akademi', icon: Info },
     { id: 'system', label: 'Sistem', icon: Info },
+    { id: 'community', label: 'Topluluk', icon: MessageCircle },
 ];
 const CATEGORY_LABELS: Record<Category, string> = {
-    announcement: 'Duyuru', market: 'Piyasa', portfolio: 'Portföy', academy: 'Akademi', system: 'Sistem',
+    announcement: 'Duyuru', market: 'Piyasa', portfolio: 'Portföy', academy: 'Akademi', system: 'Sistem', community: 'Topluluk',
 };
 const CATEGORY_ICONS: Record<Category, typeof Bell> = {
-    announcement: Bell, market: TrendingUp, portfolio: Sparkles, academy: Info, system: Info,
+    announcement: Bell, market: TrendingUp, portfolio: Sparkles, academy: Info, system: Info, community: MessageCircle,
 };
 
 export default function NotificationCenter() {
@@ -270,6 +272,7 @@ export default function NotificationCenter() {
                         </div>
                         <h3 className="mt-4 break-words text-lg font-bold leading-snug text-white">{selected.title}</h3>
                         <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{selected.message}</p>
+                        {selected.action_url && <a href={selected.action_url} onClick={() => setOpen(false)} className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-500">İlgili içeriği aç</a>}
                         <time className="mt-5 block border-t border-slate-800 pt-3 text-xs text-slate-500">{new Date(selected.created_at).toLocaleString('tr-TR')}</time>
                     </article>
                     {selected.read_at && <p className="mt-3 flex items-center gap-2 text-xs text-emerald-300"><Check className="h-4 w-4" />Okundu · {new Date(selected.read_at).toLocaleString('tr-TR')}</p>}

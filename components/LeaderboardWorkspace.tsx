@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Award, ChartNoAxesCombined, CircleHelp, LockKeyhole, RefreshCw, Trophy } from 'lucide-react';
+import { Award, ChartNoAxesCombined, ChevronLeft, ChevronRight, CircleHelp, LockKeyhole, RefreshCw, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
+import ForumAvatar from '@/components/ForumAvatar';
 
 type Period = 'day' | 'week' | 'month' | 'all';
 type SortBy = 'standard' | 'pnl_percent' | 'pnl_amount' | 'xp';
+type PageSize = '20' | '50' | '100' | 'all';
 type Entry = {
     user_id: string;
     display_name: string;
@@ -16,6 +18,8 @@ type Entry = {
     pnl_amount?: number | string | null;
     rank_position?: number | null;
     is_self?: boolean;
+    avatar_url?: string | null;
+    gender?: string | null;
 };
 
 const PERIODS: Array<{ value: Period; label: string }> = [
@@ -36,6 +40,8 @@ function formatGain(value: Entry['pnl_amount']): string | null | undefined {
 export default function LeaderboardWorkspace() {
     const [period, setPeriod] = useState<Period>('all');
     const [sortBy, setSortBy] = useState<SortBy>('standard');
+    const [pageSize, setPageSize] = useState<PageSize>('20');
+    const [page, setPage] = useState(1);
     const [entries, setEntries] = useState<Entry[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -75,6 +81,12 @@ export default function LeaderboardWorkspace() {
             return (a.rank_position ?? Number.MAX_SAFE_INTEGER) - (b.rank_position ?? Number.MAX_SAFE_INTEGER);
         });
     }, [entries, sortBy]);
+    const pageCount = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(sortedEntries.length / Number(pageSize)));
+    const currentPage = Math.min(page, pageCount);
+    const startIndex = pageSize === 'all' ? 0 : (currentPage - 1) * Number(pageSize);
+    const pageEntries = pageSize === 'all' ? sortedEntries : sortedEntries.slice(startIndex, startIndex + Number(pageSize));
+    const rangeStart = sortedEntries.length ? startIndex + 1 : 0;
+    const rangeEnd = Math.min(startIndex + pageEntries.length, sortedEntries.length);
 
     return <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
         <div className="max-w-6xl mx-auto space-y-8">
@@ -87,14 +99,14 @@ export default function LeaderboardWorkspace() {
             <section className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-xl">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                     <div className="flex flex-wrap gap-2" aria-label="Getiri dönemi">
-                        {PERIODS.map((item) => <button key={item.value} type="button" onClick={() => setPeriod(item.value)}
+                        {PERIODS.map((item) => <button key={item.value} type="button" onClick={() => { setPeriod(item.value); setPage(1); }}
                             className={`px-4 py-2 rounded-lg text-xs font-bold border transition ${period === item.value ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}>
                             {item.label}
                         </button>)}
                     </div>
                     <label className="flex items-center gap-2 text-xs font-semibold text-slate-400">
                         Sırala
-                        <select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortBy)} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/50">
+                        <select value={sortBy} onChange={(event) => { setSortBy(event.target.value as SortBy); setPage(1); }} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/50">
                             <option value="standard">Standart sıralama</option>
                             <option value="pnl_percent">Dönem Getirisi</option>
                             <option value="pnl_amount">Dönem Kazancı</option>
@@ -104,15 +116,31 @@ export default function LeaderboardWorkspace() {
                 </div>
                 {loading ? <div className="flex items-center gap-2 py-12 justify-center text-slate-400"><RefreshCw className="w-4 h-4 animate-spin" />Liderlik tablosu yükleniyor...</div>
                     : !entries.length ? <p className="py-12 text-center text-sm text-slate-400">Bu dönemde henüz görünür performans profili yok.</p>
-                        : <div className="overflow-x-auto">
+                        : <div className="space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <label className="flex items-center gap-2 text-slate-400">Sayfa başı
+                                    <select aria-label="Sayfa başına lider sayısı" value={pageSize} onChange={(event) => { setPageSize(event.target.value as PageSize); setPage(1); }} className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/50">
+                                        <option value="20">20</option><option value="50">50</option><option value="100">100</option><option value="all">Tümü</option>
+                                    </select>
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-slate-400">{rangeStart}–{rangeEnd} / {sortedEntries.length} trader</span>
+                                    {pageSize !== 'all' && <nav aria-label="Liderlik tablosu sayfaları" className="flex items-center gap-1">
+                                        <button type="button" aria-label="Önceki sayfa" disabled={currentPage <= 1} onClick={() => setPage(Math.max(1, currentPage - 1))} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2 text-[11px] font-semibold text-slate-300 transition hover:border-emerald-500/40 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={13} />Önceki</button>
+                                        <span className="min-w-12 text-center text-[10px] text-slate-400">{currentPage} / {pageCount}</span>
+                                        <button type="button" aria-label="Sonraki sayfa" disabled={currentPage >= pageCount} onClick={() => setPage(Math.min(pageCount, currentPage + 1))} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2 text-[11px] font-semibold text-slate-300 transition hover:border-emerald-500/40 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40">Sonraki<ChevronRight size={13} /></button>
+                                    </nav>}
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto">
                             <table className="w-full min-w-[760px] text-left text-sm">
                                 <thead className="text-xs uppercase tracking-wide text-slate-500 border-b border-slate-800">
                                     <tr><th className="py-3 px-3">Sıra</th><th className="py-3 px-3">Trader</th><th className="py-3 px-3">Rank</th><th className="py-3 px-3 text-right">Dönem Getirisi</th><th className="py-3 px-3 text-right">Dönem Kazancı</th><th className="py-3 px-3 text-right">Profil</th></tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/70">
-                                    {sortedEntries.map((entry, index) => <tr key={entry.user_id} className={entry.is_self ? 'bg-emerald-500/10 shadow-[inset_3px_0_0_0_rgba(52,211,153,0.9)]' : 'hover:bg-slate-800/40'}>
-                                        <td className={`py-4 px-3 font-mono ${entry.is_self ? 'font-bold text-emerald-300' : 'text-slate-400'}`}>{entry.rank_position === null ? 'Özel' : `#${entry.rank_position ?? index + 1}`}</td>
-                                        <td className={`py-4 px-3 font-semibold ${entry.is_self ? 'text-emerald-100' : 'text-white'}`}><span className="inline-flex flex-wrap items-center gap-2">{entry.display_name}{entry.is_self && <span className="rounded-full border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-1 text-[10px] font-extrabold text-emerald-200">SEN · SIRAN</span>}</span></td>
+                                    {pageEntries.map((entry, index) => <tr key={entry.user_id} className={entry.is_self ? 'bg-emerald-500/10 shadow-[inset_3px_0_0_0_rgba(52,211,153,0.9)]' : 'hover:bg-slate-800/40'}>
+                                        <td className={`py-4 px-3 font-mono ${entry.is_self ? 'font-bold text-emerald-300' : 'text-slate-400'}`}>{entry.rank_position === null ? 'Özel' : `#${entry.rank_position ?? startIndex + index + 1}`}</td>
+                                        <td className={`py-4 px-3 font-semibold ${entry.is_self ? 'text-emerald-100' : 'text-white'}`}><span className="inline-flex items-center gap-2.5"><ForumAvatar avatarUrl={entry.avatar_url} gender={entry.gender} username={entry.display_name} size={36} className="h-9 w-9 shrink-0 rounded-full border border-slate-700 object-cover" /><span className="inline-flex flex-wrap items-center gap-2">{entry.display_name}{entry.is_self && <span className="rounded-full border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-1 text-[10px] font-extrabold text-emerald-200">SEN · SIRAN</span>}</span></span></td>
                                         <td className="py-4 px-3"><span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-300"><Award className="w-3.5 h-3.5" />{entry.trader_rank} · {entry.xp} XP</span></td>
                                         <td className={`py-4 px-3 text-right font-bold ${entry.pnl_percent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{entry.pnl_percent >= 0 ? '+' : ''}{Number(entry.pnl_percent).toFixed(2)}%</td>
                                         <td className="py-4 px-3 text-right font-semibold">{(() => {
@@ -128,6 +156,7 @@ export default function LeaderboardWorkspace() {
                                     </tr>)}
                                 </tbody>
                             </table>
+                            </div>
                         </div>}
             </section>
 

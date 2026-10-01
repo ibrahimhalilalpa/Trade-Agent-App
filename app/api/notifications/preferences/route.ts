@@ -26,6 +26,12 @@ const PREFERENCE_DESCRIPTIONS: Record<string, string> = {
     order_cancelled: 'Bir sanal emir iptal edildiğinde haber ver.',
     order_failed: 'Bir sanal emir gerçekleştirilemediğinde nedenini bildir.',
     order_expired: 'Bekleyen bir sanal emrin süresi dolduğunda haber ver.',
+    community_followed_topic: 'Takip ettiğin biri yeni bir konu yayınladığında bildir.',
+    community_topic_comment: 'Konuna yeni bir yorum geldiğinde bildir.',
+    community_comment_reply: 'Yorumuna yanıt geldiğinde bildir.',
+    community_topic_vote: 'Konun faydalı bulunduğunda bildir.',
+    community_comment_vote: 'Yorumun faydalı bulunduğunda bildir.',
+    community_mention: 'Konu veya yorumlarda @kullanıcıadı ile senden bahsedildiğinde bildir.',
 };
 
 function preferenceDescription(eventKey: string, title: string): string {

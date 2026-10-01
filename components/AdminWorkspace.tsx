@@ -5,23 +5,30 @@ import { Activity, Ban, ChevronLeft, ChevronRight, CircleDollarSign, Download, K
 import StockSymbolLink from '@/components/StockSymbolLink';
 import { useAppPreferences } from '@/components/AppProviders';
 import { showError, showSuccess } from '@/lib/ui-alerts';
+import ForumAvatar from '@/components/ForumAvatar';
 
 type Role = 'user' | 'pro_trader' | 'analyst' | 'admin' | 'super_admin';
 type AdminUser = {
     id: string; email: string; createdAt: string; lastSignInAt: string | null;
     emailVerifiedAt: string | null; banned: boolean; displayName: string; role: Role;
+    avatarUrl: string | null; gender: string; isProfilePublic: boolean;
+    leaderboardVisible: boolean; leaderboardGainVisible: boolean;
     balance: number; portfolioValue: number; realizedPnl: number; unrealizedPnl: number; positionsCount: number;
 };
 type UserDetails = {
     id: string; email: string; createdAt: string; lastSignInAt: string | null; emailVerifiedAt: string | null;
-    banned: boolean; profile: { username: string; display_name: string; full_name: string; bio: string; rank_xp_adjustment: number } | null;
+    banned: boolean; profile: {
+        username: string; display_name: string; full_name: string; bio: string; avatar_url: string | null;
+        gender: string; is_profile_public: boolean; leaderboard_visible: boolean; leaderboard_gain_visible: boolean;
+        rank_xp_adjustment: number;
+    } | null;
     role: Role; rank: { xp: number; rank: string; pnlPercent: number; completedLessons: number; activeDays: number };
     portfolio: { id: string; balance: number } | null;
     positions: Array<{ symbol: string; quantity: number; average_price: number; current_price: number; pnl: number }>;
     pendingOrders: Array<{ id: string; symbol: string; side: string; order_type: string; quantity: number; trigger_price: number | null; status: string }>;
     recentTransactions: Array<{ id: string; symbol: string | null; transaction_type: string; quantity: number; cash_delta: number; realized_pnl: number; created_at: string }>;
 };
-type Event = { id: string; userId: string; email: string; displayName: string; kind: string; description: string; createdAt: string };
+type Event = { id: string; userId: string; email: string; displayName: string; kind: string; description: string; createdAt: string; metadata?: unknown };
 type Payload<T> = { data?: T; error?: string; actionLink?: string | null; emailSent?: boolean };
 
 const ROLES: Array<{ value: Role; label: string }> = [
@@ -30,6 +37,34 @@ const ROLES: Array<{ value: Role; label: string }> = [
 ];
 const money = (value: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 }).format(value);
 const date = (value: string | null) => value ? new Date(value).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const genderLabel = (value: unknown) => value === 'female' ? 'Kadın' : value === 'male' ? 'Erkek' : 'Belirtmedi';
+const yesNo = (value: unknown) => value === true ? 'Açık' : value === false ? 'Kapalı' : '—';
+const profileAuditDetails = (metadata: unknown) => {
+    if (!isRecord(metadata)) return [];
+    const changes = isRecord(metadata.changes) ? metadata.changes : metadata;
+    const details: string[] = [];
+    const fields: Array<[string, string]> = [
+        ['avatar_url', 'Profil görseli'], ['gender', 'Cinsiyet'], ['is_profile_public', 'Profil görünürlüğü'],
+        ['leaderboard_visible', 'Liderlik görünürlüğü'], ['leaderboard_gain_visible', 'TL kazanç paylaşımı'],
+        ['username', 'Kullanıcı adı'], ['full_name_changed', 'Ad soyad'], ['bio_changed', 'Biyografi'],
+    ];
+    for (const [key, label] of fields) {
+        if (!(key in changes)) continue;
+        const entry = isRecord(changes[key]) ? changes[key] : null;
+        const from = entry && 'from' in entry ? entry.from : undefined;
+        const to = entry && 'to' in entry ? entry.to : changes[key];
+        const format = (value: unknown) => key === 'avatar_url'
+            ? value ? 'Görsel mevcut' : 'Görsel yok'
+            : key === 'gender' ? genderLabel(value)
+                : key === 'is_profile_public' ? value === true ? 'Herkese açık' : 'Gizli'
+                    : key === 'leaderboard_visible' || key === 'leaderboard_gain_visible' || key === 'bio_changed' || key === 'full_name_changed'
+                        ? yesNo(value)
+                        : typeof value === 'string' ? value : '—';
+        details.push(from === undefined ? `${label}: ${format(to)}` : `${label}: ${format(from)} → ${format(to)}`);
+    }
+    return details;
+};
 
 export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
     const { confirmDialog } = useAppPreferences();
@@ -246,7 +281,7 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
     };
 
     const exportUsers = () => {
-        const headers = ['User ID', 'Email', 'Display name', 'Role', 'Account status', 'Email verified', 'Created at', 'Last sign in', 'Cash balance TRY', 'Portfolio value TRY', 'Realized PnL TRY', 'Unrealized PnL TRY', 'Position count'];
+        const headers = ['User ID', 'Email', 'Display name', 'Role', 'Account status', 'Email verified', 'Created at', 'Last sign in', 'Avatar URL', 'Gender', 'Profile visibility', 'Leaderboard visible', 'Share TL gain', 'Cash balance TRY', 'Portfolio value TRY', 'Realized PnL TRY', 'Unrealized PnL TRY', 'Position count'];
         const escapeCell = (value: string | number) => {
             let text = String(value);
             if (/^[\s]*[=+\-@]/.test(text) && typeof value === 'string') text = `'${text}`;
@@ -255,6 +290,8 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
         const rows = visibleUsers.map((item) => [
             item.id, item.email, item.displayName, item.role, item.banned ? 'banned' : 'active',
             item.emailVerifiedAt ? 'verified' : 'unverified', item.createdAt, item.lastSignInAt ?? '',
+            item.avatarUrl ?? '', item.gender, item.isProfilePublic ? 'public' : 'private',
+            item.leaderboardVisible ? 'yes' : 'no', item.leaderboardGainVisible ? 'yes' : 'no',
             item.balance, item.portfolioValue, item.realizedPnl, item.unrealizedPnl, item.positionsCount,
         ].map(escapeCell).join(','));
         const content = `\uFEFF${[headers.map(escapeCell).join(','), ...rows].join('\r\n')}`;
@@ -358,7 +395,7 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
                     <table className="w-full min-w-[1320px] text-left text-xs">
                         <thead className="bg-slate-950/80 text-[10px] uppercase tracking-wide text-slate-500"><tr>{['Hesap / E-posta', 'Rol', 'Durum', 'Doğrulama', 'Kayıt tarihi', 'Son giriş', 'Nakit', 'Portföy değeri', 'Gerçekleşen P/L', 'Açık P/L', 'Pozisyon', ''].map((item, index) => <th key={`${item}-${index}`} className="whitespace-nowrap border-b border-slate-800 px-3 py-3 font-semibold">{item}</th>)}</tr></thead>
                         <tbody>{pageUsers.map((item) => <tr key={item.id} onClick={() => setSelectedId(item.id)} className={`cursor-pointer border-b border-slate-800/70 transition last:border-0 hover:bg-slate-800/50 ${selectedId === item.id ? 'bg-emerald-500/5' : ''}`}>
-                            <td className="max-w-[260px] px-3 py-3"><strong className="block truncate text-slate-100">{item.displayName || item.email || item.id}</strong><span className="block truncate text-[10px] text-slate-500">{item.email || 'E-posta görünmüyor'}</span><span className="block truncate font-mono text-[9px] text-slate-600">{item.id}</span></td>
+                            <td className="max-w-[300px] px-3 py-3"><div className="flex min-w-0 items-center gap-2"><ForumAvatar avatarUrl={item.avatarUrl} gender={item.gender} username={item.displayName} size={30} className="h-[30px] w-[30px] shrink-0 rounded-full border border-slate-700 object-cover" /><div className="min-w-0"><strong className="block truncate text-slate-100">{item.displayName || item.email || item.id}</strong><span className="block truncate text-[10px] text-slate-500">{item.email || 'E-posta görünmüyor'}</span><span className="block truncate font-mono text-[9px] text-slate-600">{item.id}</span></div></div><div className="mt-1 flex flex-wrap gap-1 pl-8"><span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-400">{genderLabel(item.gender)}</span><span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-400">Profil {item.isProfilePublic ? 'açık' : 'gizli'}</span><span className={`rounded-full px-1.5 py-0.5 text-[9px] ${item.leaderboardVisible ? 'bg-emerald-500/10 text-emerald-300' : 'bg-slate-800 text-slate-500'}`}>Liderlik {item.leaderboardVisible ? 'açık' : 'kapalı'}</span><span className={`rounded-full px-1.5 py-0.5 text-[9px] ${item.leaderboardGainVisible ? 'bg-emerald-500/10 text-emerald-300' : 'bg-slate-800 text-slate-500'}`}>TL {item.leaderboardGainVisible ? 'açık' : 'kapalı'}</span></div></td>
                             <td className="px-3 py-3"><span className="whitespace-nowrap rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 text-[10px] font-semibold text-slate-300">{item.role.replaceAll('_', ' ')}</span></td>
                             <td className="px-3 py-3"><span className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold ${item.banned ? 'border-rose-500/20 bg-rose-500/10 text-rose-300' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'}`}>{item.banned ? 'Dondurulmuş' : 'Aktif'}</span></td>
                             <td className="px-3 py-3"><span className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold ${item.emailVerifiedAt ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>{item.emailVerifiedAt ? 'Doğrulandı' : 'Bekliyor'}</span></td>
@@ -387,6 +424,14 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
                         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs">
                             <span className="font-bold text-amber-300">{details.rank.rank}</span><span className="text-slate-300">{details.rank.xp.toLocaleString('tr-TR')} XP</span>
                             <span className="text-slate-400">· {details.rank.completedLessons} ders · {details.rank.activeDays} aktif gün · {Number(details.rank.pnlPercent).toFixed(2)}% getiri</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                            <ForumAvatar avatarUrl={details.profile?.avatar_url} gender={details.profile?.gender} username={details.profile?.username} size={40} className="h-10 w-10 rounded-full border border-slate-700 object-cover" />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs font-semibold text-white">Topluluk profili</p>
+                                <p className="mt-1 text-[10px] text-slate-400">Cinsiyet: {details.profile?.gender === 'female' ? 'Kadın' : details.profile?.gender === 'male' ? 'Erkek' : 'Belirtmedi'} · Profil: {details.profile?.is_profile_public ? 'Herkese açık' : 'Gizli'}</p>
+                                <p className="mt-1 text-[10px] text-slate-500">Liderlik görünürlüğü: {details.profile?.leaderboard_visible ? 'Açık' : 'Kapalı'} · TL kazanç paylaşımı: {details.profile?.leaderboard_gain_visible ? 'Açık' : 'Kapalı'}</p>
+                            </div>
                         </div>
                         <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-2"><p className="text-slate-400">Kayıt: <span className="text-slate-200">{date(details.createdAt)}</span></p><p className="text-slate-400">Son giriş: <span className="text-slate-200">{date(details.lastSignInAt)}</span></p></div>
 
@@ -469,7 +514,9 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
                     <div className="max-h-[700px] space-y-2 overflow-y-auto pr-1">
                         {visibleEvents.map((item) => <article key={`${item.kind}-${item.id}`} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
                             <div className="flex flex-wrap items-center justify-between gap-2"><button type="button" onClick={() => setEventUserFilter(item.userId || 'all')} className="min-w-0 text-left hover:text-emerald-300"><strong className="block truncate text-xs font-semibold text-slate-200">{item.displayName || 'Kullanıcı'}</strong><span className="block truncate text-[10px] text-slate-500">{item.email || item.userId}</span></button><span className="shrink-0 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[9px] text-emerald-300">{item.kind.replaceAll('_', ' ')}</span></div>
-                            <p className="mt-2 text-xs leading-relaxed text-slate-400">{item.description}</p><time className="mt-2 block text-[10px] text-slate-600">{date(item.createdAt)}</time>
+                            <p className="mt-2 text-xs leading-relaxed text-slate-400">{item.description}</p>
+                            {!!profileAuditDetails(item.metadata).length && <div className="mt-2 flex flex-wrap gap-1.5">{profileAuditDetails(item.metadata).map((detail) => <span key={detail} className="rounded-full border border-slate-700 bg-slate-800 px-2 py-1 text-[10px] text-slate-300">{detail}</span>)}</div>}
+                            <time className="mt-2 block text-[10px] text-slate-600">{date(item.createdAt)}</time>
                         </article>)}
                         {!visibleEvents.length && <p className="py-8 text-center text-xs text-slate-500">{eventUserFilter === 'all' ? 'Henüz sistem hareketi yok.' : 'Bu kullanıcı için etkinlik bulunmuyor.'}</p>}
                     </div>

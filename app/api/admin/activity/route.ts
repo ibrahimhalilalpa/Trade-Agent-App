@@ -47,13 +47,13 @@ export async function GET() {
     const result = [
         ...(authEvents.data ?? []).map((item) => ({
             id: item.id, userId: item.user_id, kind: item.event_type,
-            description: item.description, createdAt: item.created_at,
+            description: item.description, createdAt: item.created_at, metadata: item.metadata,
         })),
         ...(orderEvents.data ?? []).map((item) => ({
             id: item.id, userId: portfolioOwner.get(item.portfolio_id) ?? '',
             kind: `order_${item.event_type}`,
             description: `${item.symbol} · ${item.side === 'buy' ? 'Alış' : 'Satış'} emri ${item.event_type}`,
-            createdAt: item.created_at,
+            createdAt: item.created_at, metadata: null,
         })),
         ...(tradeEvents.data ?? []).map((item) => ({
             id: item.id, userId: portfolioOwner.get(item.portfolio_id) ?? '',
@@ -61,17 +61,17 @@ export async function GET() {
             description: item.transaction_type === 'cash_adjustment'
                 ? `Sanal bakiye hareketi · ${item.cash_delta} TL`
                 : `${item.symbol ?? 'Hisse'} · ${item.transaction_type === 'buy' ? 'Alış' : 'Satış'} · ${item.quantity} adet · ${item.price} TL`,
-            createdAt: item.created_at,
+            createdAt: item.created_at, metadata: null,
         })),
         ...(alertEvents.data ?? []).map((item) => ({
             id: item.id, userId: item.user_id, kind: `alert_${item.event_type}`,
             description: `${item.symbol} fiyat alarmı ${item.event_type} · hedef ${item.target_price} · fiyat ${item.market_price}`,
-            createdAt: item.created_at,
+            createdAt: item.created_at, metadata: null,
         })),
         ...(lessonEvents.data ?? []).map((item) => ({
             id: item.id, userId: item.user_id, kind: 'lesson_completed',
             description: `Akademi dersi tamamlandı: ${item.lesson_id}`,
-            createdAt: item.completed_at,
+            createdAt: item.completed_at, metadata: null,
         })),
     ].map((item) => {
         const user = userById.get(item.userId);

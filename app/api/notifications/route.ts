@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
-const CATEGORIES = ['all', 'announcement', 'market', 'portfolio', 'academy', 'system'] as const;
+const CATEGORIES = ['all', 'announcement', 'market', 'portfolio', 'academy', 'system', 'community'] as const;
 type Category = (typeof CATEGORIES)[number];
 
 async function getContext() {
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Geçersiz bildirim kategorisi.' }, { status: 400 });
     }
     const { data, error } = await supabase.from('user_notifications')
-        .select('id, announcement_id, category, severity, title, message, created_at, read_at, announcement:system_announcements!user_notifications_announcement_id_fkey(active, starts_at, ends_at)')
+        .select('id, announcement_id, category, severity, title, message, created_at, read_at, action_url, announcement:system_announcements!user_notifications_announcement_id_fkey(active, starts_at, ends_at)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -56,6 +56,7 @@ export async function GET(request: Request) {
                 message: item.message,
                 created_at: item.created_at,
                 read_at: item.read_at,
+                action_url: item.action_url,
             })),
             unreadCount: Number(count ?? 0),
         },

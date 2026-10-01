@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
+import { hasProfanity } from '@/lib/profanityFilter';
 import { getAuthRedirectUrl } from '@/lib/app-url';
 
 type UserRole = 'user' | 'pro_trader' | 'analyst' | 'admin' | 'super_admin';
@@ -26,7 +27,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
             : admin.rpc('admin_get_user_auth', { p_target_id: userId }).then(({ data, error }) => ({
                 data: { user: Array.isArray(data) ? data[0] ?? null : null }, error,
             })),
-        admin.from('user_profiles').select('username, display_name, full_name, bio, rank_xp_adjustment').eq('user_id', userId).maybeSingle(),
+        admin.from('user_profiles').select('username, display_name, full_name, bio, avatar_url, gender, is_profile_public, leaderboard_visible, leaderboard_gain_visible, rank_xp_adjustment').eq('user_id', userId).maybeSingle(),
         admin.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
         admin.from('user_portfolios').select('id, balance, created_at').eq('user_id', userId).maybeSingle(),
         admin.rpc('get_trader_rank', { p_user_id: userId }),
@@ -93,6 +94,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ us
         if (!/^[a-z][a-z0-9_]{2,23}$/.test(displayName.toLowerCase())
             || fullName.length > 120 || bio.length > 280) {
             return NextResponse.json({ error: 'Kullanıcı adı 3–24 karakter olmalı; ad soyad 120, biyografi 280 karakteri aşamaz.' }, { status: 400 });
+        }
+        if (hasProfanity(displayName) || hasProfanity(fullName) || hasProfanity(bio)) {
+            return NextResponse.json({ error: 'Profil alanları topluluk kurallarına uygun olmayan ifadeler içeremez.' }, { status: 400 });
         }
         const { error } = await admin.rpc('admin_update_user_profile', {
             p_actor_id: user.id, p_target_id: userId,
