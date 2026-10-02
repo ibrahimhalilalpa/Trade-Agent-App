@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getAuthRedirectUrl } from '@/lib/app-url';
 import { translateAuthError } from '@/lib/auth-errors';
-import { User, ShieldCheck, Activity, KeyRound, CheckCircle2, AlertCircle, Award, Eye, EyeOff } from 'lucide-react';
+import { User, ShieldCheck, Activity, KeyRound, CheckCircle2, AlertCircle, Award, Eye, EyeOff, Trash2, Snowflake, ChevronDown } from 'lucide-react';
 import { toast } from 'react-toastify';
 import WalletBalanceCard from '@/components/WalletBalanceCard';
 import SocialProfileSettings from '@/components/SocialProfileSettings';
@@ -20,6 +20,11 @@ type ProfileData = {
     leaderboardRank: number | null;
     activity: Array<{ id: string; event_type: string; description: string; created_at: string }>;
 };
+type AccountFreezeRequest = {
+    requested_at: string;
+    unfreeze_at: string;
+    delete_after: string;
+};
 
 interface ProfileWorkspaceProps {
     recoveryMode?: boolean;
@@ -32,6 +37,10 @@ const EVENT_LABELS: Record<string, string> = {
     password_changed: 'Parola güncellendi',
     password_failed: 'Hatalı parola denemesi',
     password_reset_requested: 'Parola sıfırlama istendi',
+    account_freeze_requested: 'Hesap dondurma planlandı',
+    account_reactivated: 'Hesap yeniden etkinleştirildi',
+    account_deletion_requested: 'Hesap silme istendi',
+    admin_account_status: 'Hesap erişim yönetimi',
 };
 const ROLE_LABELS: Record<string, string> = {
     user: 'Standart yatırımcı',
@@ -67,6 +76,13 @@ export default function ProfileWorkspace({ recoveryMode = false }: ProfileWorksp
     const [passwordResetBusy, setPasswordResetBusy] = useState(false);
     const [passwordMessage, setPasswordMessage] = useState('');
     const [passwordError, setPasswordError] = useState('');
+    const [freezeRequest, setFreezeRequest] = useState<AccountFreezeRequest | null>(null);
+    const [freezeDays, setFreezeDays] = useState(7);
+    const [accountPassword, setAccountPassword] = useState('');
+    const [deleteConfirmation, setDeleteConfirmation] = useState('');
+    const [accountActionBusy, setAccountActionBusy] = useState(false);
+    const [accountActionError, setAccountActionError] = useState('');
+    const [accountControlsOpen, setAccountControlsOpen] = useState(false);
 
     const refreshActivity = useCallback(async () => {
         try {
@@ -97,6 +113,13 @@ export default function ProfileWorkspace({ recoveryMode = false }: ProfileWorksp
                 setBio(payload.data.profile.bio || '');
                 setLeaderboardVisible(payload.data.profile.leaderboard_visible);
                 setLeaderboardGainVisible(payload.data.profile.leaderboard_gain_visible);
+                const accountResponse = await fetch('/api/profile/account', { cache: 'no-store' });
+                const accountPayload = await accountResponse.json() as { data?: AccountFreezeRequest | null; error?: string };
+                if (!accountResponse.ok) {
+                    setAccountActionError(accountPayload.error ?? 'Hesap durumu yüklenemedi.');
+                } else {
+                    setFreezeRequest(accountPayload.data ?? null);
+                }
             })
             .catch(() => {
                 if (active) setError('Profil servisine ulaşılamadı.');
@@ -297,6 +320,56 @@ export default function ProfileWorkspace({ recoveryMode = false }: ProfileWorksp
             setPasswordError(translateAuthError(cause instanceof Error ? cause.message : undefined, 'Parola sıfırlama bağlantısı gönderilemedi.'));
         } finally {
             setPasswordResetBusy(false);
+        }
+    };
+
+    const submitAccountAction = async (action: 'freeze' | 'delete') => {
+        setAccountActionBusy(true);
+        setAccountActionError('');
+        try {
+            const response = await fetch('/api/profile/account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action,
+                    days: freezeDays,
+                    password: accountPassword,
+                    confirmation: deleteConfirmation,
+                }),
+            });
+            const payload = await response.json() as { error?: string; data?: AccountFreezeRequest | null };
+            if (!response.ok) throw new Error(payload.error ?? 'Hesap işlemi tamamlanamadı.');
+            if (action === 'delete') {
+                setAccountPassword('');
+                setDeleteConfirmation('');
+                toast.success('Hesap silme doğrulama e-postası gönderildi. Hesabınız e-postadaki bağlantıyı açana kadar silinmez.');
+                return;
+            }
+            setFreezeRequest(payload.data ?? null);
+            setAccountPassword('');
+            const client = getSupabaseBrowserClient();
+            if (client) await client.auth.signOut({ scope: 'local' });
+            window.location.replace('/auth?accountFrozen=1');
+        } catch (cause) {
+            setAccountActionError(cause instanceof Error ? cause.message : 'Hesap işlemi tamamlanamadı.');
+        } finally {
+            setAccountActionBusy(false);
+        }
+    };
+
+    const cancelFreezeRequest = async () => {
+        setAccountActionBusy(true);
+        setAccountActionError('');
+        try {
+            const response = await fetch('/api/profile/account', { method: 'DELETE' });
+            const payload = await response.json() as { error?: string };
+            if (!response.ok) throw new Error(payload.error ?? 'Dondurma isteği iptal edilemedi.');
+            setFreezeRequest(null);
+            toast.success('Hesabınız yeniden etkinleştirildi; kalıcı silme isteği iptal edildi.');
+        } catch (cause) {
+            setAccountActionError(cause instanceof Error ? cause.message : 'Dondurma isteği iptal edilemedi.');
+        } finally {
+            setAccountActionBusy(false);
         }
     };
 
@@ -583,6 +656,71 @@ export default function ProfileWorkspace({ recoveryMode = false }: ProfileWorksp
                                         <span className="font-mono text-slate-200">{dateLabel(data.profile.updated_at)}</span>
                                     </div>
                                 </div>
+                            </section>
+
+                            <section className="space-y-5 rounded-2xl border border-rose-500/20 bg-slate-900 p-6 shadow-xl">
+                                <button
+                                    type="button"
+                                    aria-expanded={accountControlsOpen}
+                                    onClick={() => setAccountControlsOpen((open) => !open)}
+                                    className="flex w-full items-center justify-between gap-3 text-left"
+                                >
+                                    <span className="flex items-center gap-2 text-sm font-bold text-slate-200">
+                                        <ShieldCheck className="h-4 w-4 text-rose-400" />
+                                        Hesap dondurma ve silme
+                                        {accountActionError && <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">İşlem gerekli</span>}
+                                    </span>
+                                    <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${accountControlsOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {accountControlsOpen && <div className="space-y-5 border-t border-slate-800 pt-4">
+                                {freezeRequest ? (
+                                    <div className="space-y-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs leading-5 text-amber-100">
+                                        <p>Hesabınızın dondurması {dateLabel(freezeRequest.unfreeze_at)} tarihinde sona erecek. Bu tarihten sonra giriş yaparsanız 30 günlük kalıcı silme planı iptal edilir.</p>
+                                        <p>Bu tarihe kadar giriş yapmazsanız hesabınız {dateLabel(freezeRequest.delete_after)} tarihinde veya sonraki günlük otomatik kontrolde kalıcı olarak silinir.</p>
+                                        <button type="button" onClick={() => void cancelFreezeRequest()} disabled={accountActionBusy} className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2 font-bold text-amber-100 transition hover:bg-amber-400/20 disabled:opacity-50">
+                                            {accountActionBusy ? 'İşleniyor…' : 'Dondurma ve silme planını iptal et'}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs leading-5 text-amber-100">
+                                            Seçtiğiniz süre hesabınızı dondurma isteğini iptal edip geri dönmek için tanır. Bu süre içinde parolanızla giriş yaptığınız anda hesap yeniden etkinleşir ve silme planı iptal edilir. Süre bitince hesap otomatik olarak yeniden etkinleşir. İlk talepten itibaren 30 gün içinde hiç giriş yapmazsanız hesabınız ve ilişkili veriler kalıcı olarak silinir; bu işlem geri alınamaz.
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <label className="text-xs font-semibold text-slate-300">Dondurma süresi
+                                                <select value={freezeDays} onChange={(event) => setFreezeDays(Number(event.target.value))} className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white">
+                                                    <option value={1}>1 gün</option>
+                                                    <option value={7}>7 gün</option>
+                                                    <option value={14}>14 gün</option>
+                                                    <option value={30}>30 gün</option>
+                                                </select>
+                                            </label>
+                                            <label className="text-xs font-semibold text-slate-300">İşlemi onaylamak için mevcut parolanız
+                                                <input type="password" value={accountPassword} onChange={(event) => setAccountPassword(event.target.value)} autoComplete="current-password" className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white" />
+                                            </label>
+                                        </div>
+                                        <button type="button" onClick={() => void submitAccountAction('freeze')} disabled={accountActionBusy || !accountPassword} className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50">
+                                            <Snowflake className="h-4 w-4" />{accountActionBusy ? 'İşleniyor…' : 'Hesabımı geçici olarak dondur'}
+                                        </button>
+                                    </>
+                                )}
+                                {!freezeRequest && <div className="space-y-3 border-t border-slate-800 pt-4">
+                                    <h3 className="flex items-center gap-2 text-sm font-bold text-rose-300"><Trash2 className="h-4 w-4" /> Hesabı kalıcı olarak sil</h3>
+                                    <p className="text-xs leading-5 text-slate-400">Mevcut parolanız ve e-posta doğrulaması gerekir. Doğrulama bağlantısı açılana kadar hesabınız silinmez. Doğrulama tamamlanınca hesabınız ve ilişkili veriler kalıcı olarak silinir; bu işlem geri alınamaz. Parolanızı girip onay alanına “SİL” yazın.</p>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <label className="text-xs font-semibold text-slate-300">Mevcut parola
+                                            <input type="password" value={accountPassword} onChange={(event) => setAccountPassword(event.target.value)} autoComplete="current-password" className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white" />
+                                        </label>
+                                        <label className="text-xs font-semibold text-slate-300">Onay metni
+                                            <input value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} autoComplete="off" placeholder="SİL" className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white" />
+                                        </label>
+                                    </div>
+                                    <button type="button" onClick={() => void submitAccountAction('delete')} disabled={accountActionBusy || !accountPassword || deleteConfirmation !== 'SİL'} className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-xs font-bold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50">
+                                        <Trash2 className="h-4 w-4" />{accountActionBusy ? 'İşleniyor…' : 'Hesabımı kalıcı olarak sil'}
+                                    </button>
+                                </div>}
+                                {accountActionError && <p role="alert" className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-3 text-xs leading-5 text-rose-200">{accountActionError}</p>}
+                                </div>}
                             </section>
 
                             <WalletBalanceCard className="profile-wallet-panel" />

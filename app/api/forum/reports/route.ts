@@ -2,22 +2,39 @@ import {
     apiError, apiSuccess, databaseError, isUuid, readJson, requireForumUser, textField,
 } from '@/lib/forum';
 
-const REPORT_REASONS = ['spam', 'harassment', 'misleading', 'personal_info', 'other'] as const;
+const REPORT_REASONS = [
+    'spam', 'harassment', 'misleading', 'personal_info', 'other',
+    'inappropriate_profile_photo', 'inappropriate_username', 'impersonation', 'profile_other',
+] as const;
 const contentExcerpt = (content: string) => Array.from(content).slice(0, 6000).join('');
+const safeOwnReport = (report: Record<string, unknown>) => {
+    const safeReport = { ...report };
+    delete safeReport.resolution_note;
+    return { ...safeReport, reporter_resolution_summary: null };
+};
 
 export async function GET(request: Request) {
     const auth = await requireForumUser();
     if (auth.response) return auth.response;
     const params = new URL(request.url).searchParams;
+    if (params.get('mine') === '1') {
+        const { data, error } = await auth.client.from('forum_reports')
+            .select('id, status, reason, details, reporter_resolution_summary, created_at, resolved_at, target_type, target_id, target_topic_id, target_title, content_snapshot')
+            .eq('reporter_id', auth.user.id)
+            .order('created_at', { ascending: false })
+            .limit(200);
+        if (error) return databaseError(error, 'Şikâyet geçmişiniz yüklenemedi.');
+        return apiSuccess({ reports: data ?? [] });
+    }
     const targetType = params.get('target_type');
     const targetId = params.get('target_id');
-    if ((targetType !== 'topic' && targetType !== 'comment') || !isUuid(targetId)) {
-        return apiError('Şikâyet edilecek konu veya yorum geçersiz.', 400, 'INVALID_REPORT_TARGET');
+    if ((targetType !== 'topic' && targetType !== 'comment' && targetType !== 'profile') || !isUuid(targetId)) {
+        return apiError('Şikâyet edilecek konu, yorum veya profil geçersiz.', 400, 'INVALID_REPORT_TARGET');
     }
     const { data, error } = await auth.client.from('forum_reports')
         .select('id, status').eq('reporter_id', auth.user.id)
         .eq('target_type', targetType).eq('target_id', targetId)
-        .eq('status', 'pending').maybeSingle();
+        .maybeSingle();
     if (error) return databaseError(error, 'Şikâyet durumu yüklenemedi.');
     return apiSuccess({ report: data });
 }
@@ -27,13 +44,37 @@ export async function DELETE(request: Request) {
     if (auth.response) return auth.response;
     const body = await readJson(request);
     if (!body || !isUuid(body.report_id)) return apiError('Şikâyet kaydı geçersiz.', 400, 'INVALID_REPORT');
-    const { data, error } = await auth.client.from('forum_reports')
-        .update({ status: 'withdrawn', resolution_note: 'Şikâyeti bildiren kullanıcı geri çekti.', resolved_at: new Date().toISOString() })
-        .eq('id', body.report_id).eq('reporter_id', auth.user.id).eq('status', 'pending')
-        .select('id').maybeSingle();
+    const { data, error } = await auth.client.rpc('manage_own_forum_report', {
+        p_action: 'withdraw',
+        p_report_id: body.report_id,
+        p_reason: null,
+        p_details: null,
+    });
     if (error) return databaseError(error, 'Şikâyet geri çekilemedi.');
-    if (!data) return apiError('Geri çekilebilecek bekleyen bir şikâyet bulunamadı.', 404, 'REPORT_NOT_FOUND');
-    return apiSuccess({ withdrawn: true });
+    if (!data?.length) return apiError('Geri çekilebilecek açık bir şikâyet bulunamadı.', 404, 'REPORT_NOT_FOUND');
+    return apiSuccess({ withdrawn: true, report: safeOwnReport(data[0] as Record<string, unknown>) });
+}
+
+export async function PATCH(request: Request) {
+    const auth = await requireForumUser();
+    if (auth.response) return auth.response;
+    const body = await readJson(request);
+    if (!body || !isUuid(body.report_id)) return apiError('Şikâyet kaydı geçersiz.', 400, 'INVALID_REPORT');
+    if (typeof body.reason !== 'string' || !REPORT_REASONS.includes(body.reason as (typeof REPORT_REASONS)[number])) {
+        return apiError('Şikâyet nedeni seçilmelidir.', 400, 'INVALID_REPORT_REASON');
+    }
+    const detailsValue = body.details === undefined ? '' : body.details;
+    const details = detailsValue === '' ? '' : textField(detailsValue, 'Açıklama', 0, 1000, true);
+    if (typeof details !== 'string') return apiError(details.message, 400, details.code);
+    const { data, error } = await auth.client.rpc('manage_own_forum_report', {
+        p_action: 'edit',
+        p_report_id: body.report_id,
+        p_reason: body.reason,
+        p_details: details,
+    });
+    if (error) return databaseError(error, 'Şikâyet güncellenemedi.');
+    if (!data?.length) return apiError('Güncellenebilecek açık bir şikâyet bulunamadı.', 404, 'REPORT_NOT_FOUND');
+    return apiSuccess({ report: safeOwnReport(data[0] as Record<string, unknown>) });
 }
 
 export async function POST(request: Request) {
@@ -45,11 +86,18 @@ export async function POST(request: Request) {
     const targetType = body.target_type;
     const targetId = body.target_id;
     const reason = body.reason;
-    if ((targetType !== 'topic' && targetType !== 'comment') || !isUuid(targetId)) {
-        return apiError('Şikâyet edilecek konu veya yorum geçersiz.', 400, 'INVALID_REPORT_TARGET');
+    if ((targetType !== 'topic' && targetType !== 'comment' && targetType !== 'profile') || !isUuid(targetId)) {
+        return apiError('Şikâyet edilecek konu, yorum veya profil geçersiz.', 400, 'INVALID_REPORT_TARGET');
     }
     if (typeof reason !== 'string' || !REPORT_REASONS.includes(reason as (typeof REPORT_REASONS)[number])) {
         return apiError('Şikâyet nedeni seçilmelidir.', 400, 'INVALID_REPORT_REASON');
+    }
+    const profileReasons = ['inappropriate_profile_photo', 'inappropriate_username', 'impersonation', 'profile_other'];
+    if (targetType === 'profile' && !profileReasons.includes(String(reason))) {
+        return apiError('Profil şikâyeti için geçerli bir neden seçin.', 400, 'INVALID_REPORT_REASON');
+    }
+    if (targetType !== 'profile' && profileReasons.includes(String(reason))) {
+        return apiError('Bu şikâyet nedeni yalnızca profiller için kullanılabilir.', 400, 'INVALID_REPORT_REASON');
     }
     const detailsValue = body.details === undefined ? '' : body.details;
     const details = detailsValue === '' ? '' : textField(detailsValue, 'Açıklama', 0, 1000, true);
@@ -57,9 +105,24 @@ export async function POST(request: Request) {
 
     let reportedUserId: string;
     let targetTitle: string;
-    let targetTopicId = targetId;
+    let targetTopicId: string | null = targetType === 'topic' ? targetId : null;
     let snapshot: string;
-    if (targetType === 'topic') {
+    if (targetType === 'profile') {
+        const requestedUsername = typeof body.username === 'string' ? body.username.trim().replace(/^@/, '') : '';
+        if (!/^[a-z0-9_]{3,24}$/i.test(requestedUsername)) return apiError('Profil kullanıcı adı geçersiz.', 400, 'INVALID_USERNAME');
+        const { data: profiles, error } = await auth.client.rpc('forum_public_profile', { p_username: requestedUsername });
+        if (error) return databaseError(error, 'Bildirilecek profil yüklenemedi.');
+        const profile = profiles?.[0];
+        if (!profile || profile.user_id !== targetId) return apiError('Profil bulunamadı veya artık erişilebilir değil.', 404, 'PROFILE_NOT_FOUND');
+        reportedUserId = profile.user_id;
+        targetTitle = `@${profile.username}`;
+        snapshot = contentExcerpt([
+            `Kullanıcı adı: @${profile.username}`,
+            profile.display_name ? `Görünen ad: ${profile.display_name}` : '',
+            profile.bio ? `Profil açıklaması: ${profile.bio}` : '',
+            profile.avatar_url ? `Profil görseli: ${profile.avatar_url}` : '',
+        ].filter(Boolean).join('\n'));
+    } else if (targetType === 'topic') {
         const { data, error } = await auth.client.from('forum_topics')
             .select('id, user_id, title, content').eq('id', targetId).maybeSingle();
         if (error) return databaseError(error, 'Şikâyet edilecek konu yüklenemedi.');

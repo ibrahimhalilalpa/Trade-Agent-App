@@ -510,7 +510,8 @@ alter table public.user_activity_logs add constraint user_activity_logs_event_ty
         'stock_removed', 'portfolio_order', 'portfolio_cash_adjustment', 'lesson_completed',
         'lesson_uncompleted', 'admin_cash_adjustment', 'admin_role_changed', 'admin_account_status',
         'admin_order_status', 'admin_alert_status', 'admin_position_adjusted', 'admin_rank_adjusted',
-        'admin_profile_updated', 'admin_user_invited'));
+        'admin_profile_updated', 'admin_user_invited', 'account_freeze_requested',
+        'account_reactivated', 'account_deletion_requested', 'forum_topic_created'));
 
 create or replace function public.admin_adjust_position(
     p_actor_id uuid,

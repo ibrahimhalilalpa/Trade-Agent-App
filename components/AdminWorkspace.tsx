@@ -27,7 +27,9 @@ type UserDetails = {
     positions: Array<{ symbol: string; quantity: number; average_price: number; current_price: number; pnl: number }>;
     pendingOrders: Array<{ id: string; symbol: string; side: string; order_type: string; quantity: number; trigger_price: number | null; status: string }>;
     recentTransactions: Array<{ id: string; symbol: string | null; transaction_type: string; quantity: number; cash_delta: number; realized_pnl: number; created_at: string }>;
+    restriction: { restriction_type: 'suspension' | 'closure'; reason_title: string; explanation: string; starts_at: string; ends_at: string | null; is_active: boolean } | null;
 };
+type ModerationReason = { id: string; title: string; explanation: string; is_active: boolean };
 type Event = { id: string; userId: string; email: string; displayName: string; kind: string; description: string; createdAt: string; metadata?: unknown };
 type Payload<T> = { data?: T; error?: string; actionLink?: string | null; emailSent?: boolean };
 
@@ -92,6 +94,13 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
     const [recoveryLink, setRecoveryLink] = useState('');
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteName, setInviteName] = useState('');
+    const [moderationReasons, setModerationReasons] = useState<ModerationReason[]>([]);
+    const [moderationReasonId, setModerationReasonId] = useState('');
+    const [moderationDays, setModerationDays] = useState('10');
+    const [moderationExplanation, setModerationExplanation] = useState('');
+    const [editingReasonId, setEditingReasonId] = useState('');
+    const [reasonTitleDraft, setReasonTitleDraft] = useState('');
+    const [reasonExplanationDraft, setReasonExplanationDraft] = useState('');
 
     useEffect(() => {
         if (error) showError(error);
@@ -99,6 +108,25 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
     useEffect(() => {
         if (notice) showSuccess(notice);
     }, [notice]);
+
+    const loadModerationReasons = useCallback(async () => {
+        try {
+            const response = await fetch('/api/admin/account-moderation', { cache: 'no-store' });
+            const payload = await response.json() as Payload<ModerationReason[]>;
+            if (!response.ok || !payload.data) throw new Error(payload.error ?? 'Dondurma nedenleri yüklenemedi.');
+            setModerationReasons(payload.data);
+            const firstActive = payload.data.find((reason) => reason.is_active);
+            setModerationReasonId((current) => current || firstActive?.id || '');
+            setModerationExplanation((current) => current || firstActive?.explanation || '');
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Dondurma nedenleri yüklenemedi.');
+        }
+    }, []);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => { void loadModerationReasons(); }, 0);
+        return () => window.clearTimeout(timer);
+    }, [loadModerationReasons]);
 
     const loadUsers = useCallback(async () => {
         setLoading(true);
@@ -192,12 +220,6 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
             if (payload.actionLink) setRecoveryLink(payload.actionLink);
             else if (action === 'recovery_link' && payload.emailSent) setNotice('Parola yenileme e-postası kullanıcıya gönderildi.');
             else setNotice('İşlem başarıyla tamamlandı.');
-            if (action === 'delete') {
-                setSelectedId('');
-                setDetails(null);
-                await loadUsers();
-                return;
-            }
             await loadUsers();
             await loadDetails(selectedId);
         } catch (cause) {
@@ -275,6 +297,59 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
             setSelectedId(payload.data.id);
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : 'Kullanıcı davet edilemedi.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const saveModerationReason = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (busy) return;
+        setBusy(true);
+        setError('');
+        setNotice('');
+        try {
+            const response = await fetch('/api/admin/account-moderation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...(editingReasonId ? { id: editingReasonId } : {}),
+                    title: reasonTitleDraft,
+                    explanation: reasonExplanationDraft,
+                    isActive: true,
+                }),
+            });
+            const payload = await response.json() as Payload<ModerationReason>;
+            if (!response.ok || !payload.data) throw new Error(payload.error ?? 'Neden şablonu kaydedilemedi.');
+            setNotice('Dondurma nedeni kaydedildi.');
+            setEditingReasonId('');
+            setReasonTitleDraft('');
+            setReasonExplanationDraft('');
+            await loadModerationReasons();
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Neden şablonu kaydedilemedi.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const deactivateModerationReason = async (reason: ModerationReason) => {
+        if (busy) return;
+        setBusy(true);
+        setError('');
+        setNotice('');
+        try {
+            const response = await fetch('/api/admin/account-moderation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id: reason.id }),
+            });
+            const payload = await response.json() as Payload<unknown>;
+            if (!response.ok) throw new Error(payload.error ?? 'Neden devre dışı bırakılamadı.');
+            setNotice('Dondurma nedeni devre dışı bırakıldı.');
+            await loadModerationReasons();
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Neden devre dışı bırakılamadı.');
         } finally {
             setBusy(false);
         }
@@ -477,18 +552,62 @@ export default function AdminWorkspace({ actorRole }: { actorRole: Role }) {
                             </div>
                         </form>}
 
-                        <div className="flex flex-wrap gap-2 border-t border-slate-800 pt-4">
-                            <button disabled={busy} onClick={() => void performAction(details.banned ? 'unban' : 'ban')} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50 ${details.banned ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-rose-500/20 bg-rose-500/10 text-rose-300'}`}><Ban className="h-4 w-4" />{details.banned ? 'Hesabı etkinleştir' : 'Hesabı dondur'}</button>
-                            <button disabled={busy} onClick={() => void performAction('recovery_link')} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-200 disabled:opacity-50"><KeyRound className="h-4 w-4" />Sıfırlama bağlantısı üret</button>
-                            <button disabled={busy || details.id === '' || details.id === undefined} onClick={() => {
-                                void confirmDialog({
-                                    title: 'Hesap kalıcı olarak silinsin mi?',
-                                    message: `${details.email} hesabı ve bağlı verileri kalıcı olarak silinecek. Bu işlem geri alınamaz.`,
-                                    confirmLabel: 'Hesabı sil',
-                                    danger: true,
-                                }).then((confirmed) => { if (confirmed) void performAction('delete'); });
-                            }} className="inline-flex items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300 disabled:opacity-50"><Trash2 className="h-4 w-4" />Hesabı kalıcı sil</button>
-                        </div>
+                        {details.restriction && <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs">
+                            <p className="font-bold text-rose-300">{details.restriction.restriction_type === 'closure' ? 'Hesap kalıcı kapalı' : `Hesap donduruldu · ${date(details.restriction.ends_at)}`}</p>
+                            <p className="mt-1 text-slate-200">{details.restriction.reason_title}</p>
+                            <p className="mt-1 whitespace-pre-wrap text-slate-400">{details.restriction.explanation}</p>
+                        </div>}
+                        <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                            <div><h3 className="flex items-center gap-2 text-sm font-bold text-white"><Ban className="h-4 w-4 text-rose-300" />Hesap erişim yönetimi</h3><p className="mt-1 text-[10px] text-slate-500">Kullanıcı giriş denemesinde bitiş tarihini ve bu gerekçeyi görür; kalıcı kapatmada da itiraz edebilir.</p></div>
+                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_130px]">
+                                <label className="space-y-1 text-[10px] font-semibold text-slate-400">Dondurma nedeni
+                                    <select value={moderationReasonId} onChange={(event) => {
+                                        const reason = moderationReasons.find((item) => item.id === event.target.value);
+                                        setModerationReasonId(event.target.value);
+                                        setModerationExplanation(reason?.explanation ?? '');
+                                    }} className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs text-white">
+                                        <option value="">Neden seçin</option>
+                                        {moderationReasons.filter((reason) => reason.is_active).map((reason) => <option key={reason.id} value={reason.id}>{reason.title}</option>)}
+                                    </select>
+                                </label>
+                                {!details.banned && <label className="space-y-1 text-[10px] font-semibold text-slate-400">Süre (gün)
+                                    <input type="number" min={1} max={3650} value={moderationDays} onChange={(event) => setModerationDays(event.target.value)} className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs text-white" />
+                                </label>}
+                                <label className="space-y-1 text-[10px] font-semibold text-slate-400 sm:col-span-2">Kullanıcıya gösterilecek açıklama
+                                    <textarea minLength={10} maxLength={1000} rows={3} value={moderationExplanation} onChange={(event) => setModerationExplanation(event.target.value)} className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs text-white" />
+                                </label>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {details.banned
+                                    ? <button disabled={busy} onClick={() => void performAction('unban')} className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300 disabled:opacity-50"><Ban className="h-4 w-4" />Hesabı etkinleştir</button>
+                                    : <button disabled={busy || !moderationReasonId || !moderationExplanation.trim()} onClick={() => void performAction('ban', { reasonId: moderationReasonId, explanation: moderationExplanation, days: Number(moderationDays) })} className="inline-flex items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300 disabled:opacity-50"><Ban className="h-4 w-4" />Süreli dondur</button>}
+                                <button disabled={busy} onClick={() => void performAction('recovery_link')} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-200 disabled:opacity-50"><KeyRound className="h-4 w-4" />Sıfırlama bağlantısı üret</button>
+                                {details.restriction?.restriction_type !== 'closure' && <button disabled={busy || !moderationReasonId || !moderationExplanation.trim()} onClick={() => {
+                                    void confirmDialog({
+                                        title: 'Hesap itiraza açık şekilde kapatılsın mı?',
+                                        message: `${details.email} hesabına süresiz giriş kısıtlaması uygulanacak. Verileri silinmeyecek; kullanıcı itiraz edebilecek ve itiraz kabul edilirse hesap yeniden açılacak.`,
+                                        confirmLabel: 'Hesabı kapat',
+                                        danger: true,
+                                    }).then((confirmed) => {
+                                        if (confirmed) void performAction('delete', { reasonId: moderationReasonId, explanation: moderationExplanation });
+                                    });
+                                }} className="inline-flex items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300 disabled:opacity-50"><Trash2 className="h-4 w-4" />İtiraza açık kapat</button>}
+                            </div>
+                            <details className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                                <summary className="cursor-pointer text-xs font-semibold text-slate-300">Neden-açıklama şablonlarını yönet</summary>
+                                <div className="mt-3 space-y-2">
+                                    {moderationReasons.map((reason) => <div key={reason.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/70 p-2">
+                                        <div className="min-w-0 flex-1"><p className="text-xs font-semibold text-white">{reason.title}{!reason.is_active && <span className="ml-2 text-[10px] text-slate-500">Devre dışı</span>}</p><p className="mt-1 whitespace-pre-wrap text-[10px] text-slate-500">{reason.explanation}</p></div>
+                                        <div className="flex shrink-0 gap-2"><button type="button" onClick={() => { setEditingReasonId(reason.id); setReasonTitleDraft(reason.title); setReasonExplanationDraft(reason.explanation); }} className="rounded-md border border-slate-700 px-2 py-1 text-[10px] font-bold text-slate-300">Düzenle</button>{reason.is_active && <button type="button" disabled={busy} onClick={() => void deactivateModerationReason(reason)} className="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[10px] font-bold text-rose-300">Kapat</button>}</div>
+                                    </div>)}
+                                    <form onSubmit={(event) => void saveModerationReason(event)} className="space-y-2 border-t border-slate-800 pt-3">
+                                        <input required minLength={2} maxLength={80} value={reasonTitleDraft} onChange={(event) => setReasonTitleDraft(event.target.value)} placeholder="Neden başlığı" className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-white" />
+                                        <textarea required minLength={10} maxLength={1000} rows={2} value={reasonExplanationDraft} onChange={(event) => setReasonExplanationDraft(event.target.value)} placeholder="Varsayılan açıklama (işlem sırasında düzenlenebilir)" className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-white" />
+                                        <div className="flex gap-2"><button disabled={busy} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{editingReasonId ? 'Şablonu güncelle' : 'Şablon ekle'}</button>{editingReasonId && <button type="button" onClick={() => { setEditingReasonId(''); setReasonTitleDraft(''); setReasonExplanationDraft(''); }} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-300">Vazgeç</button>}</div>
+                                    </form>
+                                </div>
+                            </details>
+                        </section>
 
                         <div className="grid grid-cols-1 gap-4 border-t border-slate-800 pt-4 md:grid-cols-2">
                             <div><h3 className="mb-2 text-xs font-bold text-slate-200">Aktif pozisyonlar</h3><div className="max-h-36 space-y-2 overflow-y-auto">{details.positions.map((item) => <div key={item.symbol} className="flex justify-between rounded-lg bg-slate-950/70 px-3 py-2 text-xs"><span><StockSymbolLink symbol={item.symbol} /> · {item.quantity}</span><span className={Number(item.pnl) >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{money(Number(item.pnl))}</span></div>)}{!details.positions.length && <p className="text-xs text-slate-500">Açık pozisyon yok.</p>}</div></div>

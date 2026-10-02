@@ -83,9 +83,16 @@ export default function AuthStatus({ onNavigate }: { onNavigate?: () => void }) 
 
         setSigningOut(true);
         try {
-            void fetch('/api/profile/activity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventType: 'logout' }) })
-                .then((activity) => { if (!activity.ok) console.error('Logout activity could not be recorded.', activity.status); })
-                .catch((cause: unknown) => console.error('Logout activity could not be recorded.', cause));
+            try {
+                const activity = await fetch('/api/profile/activity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ eventType: 'logout' }),
+                });
+                if (!activity.ok) console.error('Logout activity could not be recorded.', activity.status);
+            } catch (cause: unknown) {
+                console.error('Logout activity could not be recorded.', cause);
+            }
             const result = await client.auth.signOut();
             if (result.error) throw result.error;
             setUser(null);

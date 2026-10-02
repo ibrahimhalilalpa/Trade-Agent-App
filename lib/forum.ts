@@ -14,7 +14,7 @@ export const FORUM_CATEGORIES = [
     'makro_ekonomi',
 ] as const;
 
-export type ForumCategory = (typeof FORUM_CATEGORIES)[number];
+export type ForumCategory = string;
 export type ForumVote = 'helpful' | 'unhelpful';
 
 export interface ForumTopicRecord {
@@ -137,7 +137,7 @@ export function apiValidationError(error: ApiError) {
 }
 
 export function isCategory(value: unknown): value is ForumCategory {
-    return typeof value === 'string' && FORUM_CATEGORIES.includes(value as ForumCategory);
+    return typeof value === 'string' && /^[a-z][a-z0-9_]{1,39}$/.test(value);
 }
 
 export function normalizeSymbol(value: unknown): string | null | ApiError {

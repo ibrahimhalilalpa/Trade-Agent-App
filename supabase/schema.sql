@@ -322,7 +322,8 @@ create table if not exists public.user_activity_logs (
         'lesson_completed', 'lesson_uncompleted', 'admin_cash_adjustment',
         'admin_role_changed', 'admin_account_status', 'admin_order_status',
         'admin_alert_status', 'admin_position_adjusted', 'admin_rank_adjusted',
-        'admin_profile_updated', 'admin_user_invited'
+        'admin_profile_updated', 'admin_user_invited', 'account_freeze_requested',
+        'account_reactivated', 'account_deletion_requested', 'forum_topic_created'
     )),
     description text not null check (char_length(description) between 1 and 180),
     metadata jsonb not null default '{}'::jsonb,
@@ -338,7 +339,8 @@ alter table public.user_activity_logs add constraint user_activity_logs_event_ty
         'lesson_completed', 'lesson_uncompleted', 'admin_cash_adjustment',
         'admin_role_changed', 'admin_account_status', 'admin_order_status',
         'admin_alert_status', 'admin_position_adjusted', 'admin_rank_adjusted',
-        'admin_profile_updated', 'admin_user_invited'
+        'admin_profile_updated', 'admin_user_invited', 'account_freeze_requested',
+        'account_reactivated', 'account_deletion_requested', 'forum_topic_created'
     ));
 
 drop trigger if exists user_profiles_touch_updated_at on public.user_profiles;

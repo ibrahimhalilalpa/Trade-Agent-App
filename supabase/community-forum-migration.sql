@@ -9,7 +9,8 @@ alter table public.user_activity_logs add constraint user_activity_logs_event_ty
         'lesson_completed', 'lesson_uncompleted', 'admin_cash_adjustment',
         'admin_role_changed', 'admin_account_status', 'admin_order_status',
         'admin_alert_status', 'admin_position_adjusted', 'admin_rank_adjusted',
-        'admin_profile_updated', 'admin_user_invited', 'forum_topic_created'
+        'admin_profile_updated', 'admin_user_invited', 'forum_topic_created',
+        'account_freeze_requested', 'account_reactivated', 'account_deletion_requested'
     ));
 
 alter table public.user_profiles

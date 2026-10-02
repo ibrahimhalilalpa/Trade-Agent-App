@@ -35,12 +35,13 @@ export async function GET(request: Request) {
     }
     const visibleProfiles = (profiles ?? []) as Array<{
         user_id: string;
+        username: string | null;
         avatar_url: string | null;
         gender: string | null;
     }>;
     const profileById = new Map(visibleProfiles.map((profile) => [
         profile.user_id,
-        { avatar_url: profile.avatar_url, gender: profile.gender },
+        { username: profile.username, avatar_url: profile.avatar_url, gender: profile.gender },
     ]));
     return NextResponse.json({
         success: true,
@@ -48,6 +49,7 @@ export async function GET(request: Request) {
             const profile = profileById.get(entry.user_id);
             return {
                 ...entry,
+                username: profile?.username ?? null,
                 avatar_url: profile?.avatar_url ?? null,
                 gender: profile?.gender ?? null,
                 is_self: entry.user_id === user?.id,

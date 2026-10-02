@@ -63,12 +63,12 @@ export default function ForumReportControl({
                 return;
             }
             if (!response.ok) throw new Error(payload.error ?? 'Şikâyet gönderilemedi.');
-            setMessage('Şikâyetiniz incelemeye gönderildi.');
             const report = (payload as { data?: { id?: string; status?: string } }).data;
             setActiveReport(report?.id && report.status ? { id: report.id, status: report.status } : { id: '', status: 'pending' });
             setChecked(true);
             setOpen(false);
             setDetails('');
+            setMessage('');
         } catch (cause) {
             setMessage(cause instanceof Error ? cause.message : 'Şikâyet gönderilemedi.');
         } finally {
@@ -89,7 +89,7 @@ export default function ForumReportControl({
             const payload = await response.json() as { error?: string };
             if (!response.ok) throw new Error(payload.error ?? 'Şikâyet geri çekilemedi.');
             setActiveReport(null);
-            setMessage('Şikâyetiniz geri çekildi.');
+            setMessage('');
         } catch (cause) {
             setMessage(cause instanceof Error ? cause.message : 'Şikâyet geri çekilemedi.');
         } finally {
@@ -98,11 +98,11 @@ export default function ForumReportControl({
     };
 
     return <span className="inline-flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => void openControl()} aria-label={activeReport ? 'Şikâyet durumunu yönet' : 'İçeriği bildir'} title={activeReport ? 'Şikâyeti geri çek' : 'İçeriği bildir'} className={`inline-flex items-center justify-center text-slate-500 transition hover:text-amber-300 ${compact ? 'h-7 w-7' : 'gap-1 text-[10px] font-semibold'} ${compact ? '' : ''}`}><Flag size={12} />{!compact && (activeReport ? 'Şikâyet bekliyor' : 'İçeriği şikâyet et')}</button>
+        <button type="button" onClick={() => void openControl()} aria-label={activeReport ? 'Şikâyet durumunu yönet' : 'İçeriği bildir'} title={activeReport ? 'Şikâyeti yönet' : 'İçeriği bildir'} className={`inline-flex items-center justify-center text-slate-500 transition hover:text-amber-300 ${compact ? 'h-7 w-7' : 'gap-1 text-[10px] font-semibold'} ${compact ? '' : ''}`}><Flag size={12} />{!compact && (activeReport ? 'Şikâyeti yönet' : 'İçeriği şikâyet et')}</button>
         {message && <span role="status" className="text-[10px] text-slate-400">{message}</span>}
         {open && activeReport && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
             <section role="dialog" aria-modal="true" className="w-full max-w-md space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
-                <div><h2 className="text-lg font-bold text-white">Bekleyen şikâyet</h2><p className="mt-1 text-xs leading-5 text-slate-400">Bu içerik için gönderdiğin şikâyet incelemede. İstersen geri çekebilirsin.</p></div>
+                <div><h2 className="text-lg font-bold text-white">Şikâyet kaydı</h2><p className="mt-1 text-xs leading-5 text-slate-400">Şikâyet durumunu İçeriklerim → Bildirdiklerim bölümünden takip edebilir, açık durumdayken düzenleyebilir veya geri çekebilirsin.</p></div>
                 <div className="flex justify-end gap-2"><button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300">Kapat</button><button type="button" disabled={busy} onClick={() => void withdraw()} className="rounded-lg bg-rose-500/10 px-4 py-2 text-xs font-bold text-rose-300 disabled:opacity-50">{busy ? 'İşleniyor…' : 'Şikâyeti geri çek'}</button></div>
             </section>
         </div>}

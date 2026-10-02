@@ -93,6 +93,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     }
     if ('category' in body) {
         if (!isCategory(body.category)) return apiError('Kategori geçersiz.', 400, 'INVALID_CATEGORY');
+        const { data: categoryRecord, error: categoryError } = await auth.client.from('forum_categories')
+            .select('slug').eq('slug', body.category).eq('is_active', true).maybeSingle();
+        if (categoryError) return databaseError(categoryError, 'Topluluk kategorisi doğrulanamadı.');
+        if (!categoryRecord) return apiError('Seçilen kategori artık kullanılamıyor.', 400, 'INVALID_CATEGORY');
         patch.category = body.category;
     }
     if ('related_symbol' in body) {

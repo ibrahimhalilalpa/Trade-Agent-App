@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { hasProfanity } from '@/lib/profanityFilter';
@@ -32,6 +33,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
         admin.from('user_portfolios').select('id, balance, created_at').eq('user_id', userId).maybeSingle(),
         admin.rpc('get_trader_rank', { p_user_id: userId }),
     ]);
+    const restriction = await admin.from('account_moderation_restrictions')
+        .select('restriction_type, reason_title, explanation, starts_at, ends_at, is_active')
+        .eq('user_id', userId).eq('is_active', true).maybeSingle();
     const portfolioId = portfolio.data?.id;
     const [positions, orders, transactions] = portfolioId ? await Promise.all([
         admin.from('user_positions').select('symbol, quantity, average_price, current_price, pnl, updated_at')
@@ -41,10 +45,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
         admin.from('portfolio_transactions').select('id, symbol, transaction_type, quantity, price, cash_delta, realized_pnl, created_at')
             .eq('portfolio_id', portfolioId).order('created_at', { ascending: false }).limit(50),
     ]) : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
-    const failure = authResult.error ?? profile.error ?? role.error ?? portfolio.error ?? rank.error ?? positions.error ?? orders.error ?? transactions.error;
+    const failure = authResult.error ?? profile.error ?? role.error ?? portfolio.error ?? rank.error ?? positions.error ?? orders.error ?? transactions.error ?? restriction.error;
     if (failure) {
         console.error('Admin user detail query failed.', failure);
-        return NextResponse.json({ error: 'Kullanıcı detayları yüklenemedi.' }, { status: 500 });
+        return NextResponse.json({ error: restriction.error ? 'Hesap moderasyonu verileri yüklenemedi. account-moderation-migration.sql dosyasını çalıştırın.' : 'Kullanıcı detayları yüklenemedi.' }, { status: 500 });
     }
     const user = authResult.data.user;
     if (!user) return NextResponse.json({ error: 'Kullanıcı bulunamadı.' }, { status: 404 });
@@ -57,6 +61,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
             lastSignInAt: user.last_sign_in_at ?? null,
             emailVerifiedAt: user.email_confirmed_at ?? null,
             banned: Boolean(user.banned_until && new Date(user.banned_until).getTime() > Date.now()),
+            restriction: restriction.data && (!restriction.data.ends_at || new Date(restriction.data.ends_at).getTime() > Date.now())
+                ? restriction.data
+                : null,
             profile: profile.data,
             role: role.data?.role ?? 'user',
             rank: rank.data,
@@ -145,7 +152,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ use
     if (context.response) return context.response;
     const { userId } = await params;
     if (!UUID_PATTERN.test(userId)) return NextResponse.json({ error: 'Geçersiz kullanıcı kimliği.' }, { status: 400 });
-    let body: { action?: unknown; amount?: unknown; note?: unknown };
+    let body: { action?: unknown; amount?: unknown; note?: unknown; reasonId?: unknown; explanation?: unknown; days?: unknown };
     try {
         body = await request.json() as { action?: unknown; amount?: unknown; note?: unknown };
     } catch {
@@ -178,25 +185,105 @@ export async function POST(request: Request, { params }: { params: Promise<{ use
         return NextResponse.json({ success: true });
     }
 
-    if (body.action === 'ban' || body.action === 'unban') {
+    if (body.action === 'ban' || body.action === 'unban' || body.action === 'delete') {
         if (!serviceClient) {
-            return NextResponse.json({ error: 'Hesap dondurma Supabase Auth Admin API gerektirir. Sunucu ortamında SUPABASE_SERVICE_ROLE_KEY tanımlayın.' }, { status: 503 });
+            return NextResponse.json({ error: 'Hesap moderasyonu Supabase Auth Admin API gerektirir. Sunucu ortamında SUPABASE_SERVICE_ROLE_KEY tanımlayın.' }, { status: 503 });
         }
-        if (body.action === 'ban' && user.id === userId) {
-            return NextResponse.json({ error: 'Kendi hesabınızı donduramazsınız.' }, { status: 400 });
+        if (body.action !== 'unban' && user.id === userId) {
+            return NextResponse.json({ error: 'Kendi hesabınıza kısıtlama uygulayamazsınız.' }, { status: 400 });
         }
-        const { error } = await serviceClient.auth.admin.updateUserById(userId, {
-            ban_duration: body.action === 'ban' ? '876000h' : 'none',
-        });
-        if (error) {
-            console.error('Admin account status update failed.', error);
-            return NextResponse.json({ error: 'Hesap durumu güncellenemedi.' }, { status: 500 });
+        const { data: targetAuth, error: targetAuthError } = await serviceClient.auth.admin.getUserById(userId);
+        if (targetAuthError || !targetAuth.user) {
+            if (targetAuthError) console.error('Admin account status target lookup failed.', targetAuthError);
+            return NextResponse.json({ error: 'Hedef hesabın e-posta bilgisi doğrulanamadı.' }, { status: 404 });
+        }
+        let reasonTitle = '';
+        let explanation = '';
+        let reasonId: string | null = null;
+        let endsAt: string | null = null;
+        let restrictionType: 'suspension' | 'closure' | null = null;
+        if (body.action !== 'unban') {
+            if (typeof body.reasonId !== 'string' || !UUID_PATTERN.test(body.reasonId)) {
+                return NextResponse.json({ error: 'Bir dondurma nedeni seçin.' }, { status: 400 });
+            }
+            const { data: reason, error: reasonError } = await serviceClient.from('account_moderation_reasons')
+                .select('id, title, explanation').eq('id', body.reasonId).eq('is_active', true).maybeSingle();
+            if (reasonError || !reason) {
+                if (reasonError) console.error('Admin account moderation reason lookup failed.', reasonError);
+                return NextResponse.json({ error: 'Seçilen neden bulunamadı veya devre dışı bırakılmış.' }, { status: 400 });
+            }
+            reasonTitle = reason.title;
+            explanation = typeof body.explanation === 'string' ? body.explanation.trim() : '';
+            if (explanation.length < 10 || explanation.length > 1000) {
+                return NextResponse.json({ error: 'Açıklama 10-1000 karakter arasında olmalıdır.' }, { status: 400 });
+            }
+            reasonId = reason.id;
+            restrictionType = body.action === 'delete' ? 'closure' : 'suspension';
+            if (restrictionType === 'suspension') {
+                const days = Number(body.days);
+                if (!Number.isInteger(days) || days < 1 || days > 3650) {
+                    return NextResponse.json({ error: 'Dondurma süresi 1-3650 gün arasında bir tam sayı olmalıdır.' }, { status: 400 });
+                }
+                endsAt = new Date(Date.now() + days * 86400000).toISOString();
+            }
+            const email = targetAuth.user.email?.trim().toLocaleLowerCase('en-US');
+            if (!email) return NextResponse.json({ error: 'Hedef hesabın e-posta adresi bulunamadı.' }, { status: 400 });
+            const startsAt = new Date().toISOString();
+            const { data: previousRestriction, error: previousRestrictionError } = await serviceClient
+                .from('account_moderation_restrictions').select('*').eq('user_id', userId).maybeSingle();
+            if (previousRestrictionError) {
+                console.error('Existing account restriction could not be loaded.', previousRestrictionError);
+                return NextResponse.json({ error: 'Mevcut hesap kısıtlaması doğrulanamadı.' }, { status: 500 });
+            }
+            const { error: restrictionError } = await serviceClient.from('account_moderation_restrictions').upsert({
+                user_id: userId,
+                email_hash: createHash('sha256').update(email).digest('hex'),
+                restriction_type: restrictionType,
+                reason_id: reasonId,
+                reason_title: reasonTitle,
+                explanation,
+                starts_at: startsAt,
+                ends_at: endsAt,
+                is_active: true,
+                moderator_id: user.id,
+                updated_at: startsAt,
+            });
+            if (restrictionError) {
+                console.error('Admin account restriction could not be saved.', restrictionError);
+                return NextResponse.json({ error: 'Hesap kısıtlaması kaydedilemedi. account-moderation-migration.sql migration dosyasını uygulayın.' }, { status: 500 });
+            }
+            const duration = restrictionType === 'closure' ? '876000h' : `${Number(body.days) * 24}h`;
+            const { error: authError } = await serviceClient.auth.admin.updateUserById(userId, { ban_duration: duration });
+            if (authError) {
+                console.error('Admin account restriction could not be applied to Supabase Auth.', authError);
+                const rollback = previousRestriction
+                    ? await serviceClient.from('account_moderation_restrictions').upsert(previousRestriction)
+                    : await serviceClient.from('account_moderation_restrictions')
+                        .update({ is_active: false, updated_at: new Date().toISOString() }).eq('user_id', userId);
+                const rollbackError = rollback.error;
+                if (rollbackError) console.error('Failed to roll back account restriction after Auth error.', rollbackError);
+                return NextResponse.json({ error: 'Hesap kısıtlaması giriş sistemine uygulanamadı.' }, { status: 500 });
+            }
+        } else {
+            const { error: authError } = await serviceClient.auth.admin.updateUserById(userId, { ban_duration: 'none' });
+            if (authError) {
+                console.error('Admin account reactivation failed.', authError);
+                return NextResponse.json({ error: 'Hesap durumu güncellenemedi.' }, { status: 500 });
+            }
+            const { error: restrictionError } = await serviceClient.from('account_moderation_restrictions')
+                .update({ is_active: false, updated_at: new Date().toISOString() }).eq('user_id', userId).eq('is_active', true);
+            if (restrictionError) {
+                console.error('Admin account restriction could not be cleared.', restrictionError);
+                return NextResponse.json({ error: 'Hesap açıldı ancak moderasyon kaydı kapatılamadı.' }, { status: 500 });
+            }
         }
         const { error: auditError } = await admin.from('user_activity_logs').insert({
             user_id: userId,
             event_type: 'admin_account_status',
-            description: body.action === 'ban' ? 'Hesap yönetici tarafından donduruldu.' : 'Hesap yönetici tarafından yeniden etkinleştirildi.',
-            metadata: { actor_id: user.id, action: body.action },
+            description: body.action === 'unban'
+                ? 'Hesap yönetici tarafından yeniden etkinleştirildi.'
+                : body.action === 'delete' ? 'Hesap yönetici tarafından itiraz hakkı korunarak kapatıldı.' : 'Hesap yönetici tarafından süreli olarak donduruldu.',
+            metadata: { actor_id: user.id, action: body.action, reason_title: reasonTitle, explanation, ends_at: endsAt },
         });
         if (auditError) console.error('Admin account status audit logging failed.', auditError);
         if (auditError) return NextResponse.json({ error: 'Hesap durumu değişti ancak denetim kaydı eklenemedi.' }, { status: 500 });
@@ -236,22 +323,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ use
             return NextResponse.json({ error: 'Bağlantı oluşturuldu ancak denetim kaydı eklenemedi; bağlantıyı güvenli işlem için tekrar oluşturun.' }, { status: 500 });
         }
         return NextResponse.json({ success: true, emailSent: !serviceClient, actionLink: data.properties.action_link });
-    }
-
-    if (body.action === 'delete') {
-        if (!serviceClient) {
-            return NextResponse.json({ error: 'Hesap silme Supabase Auth Admin API gerektirir. Sunucu ortamında SUPABASE_SERVICE_ROLE_KEY tanımlayın.' }, { status: 503 });
-        }
-        if (user.id === userId) return NextResponse.json({ error: 'Kendi yönetici hesabınızı buradan silemezsiniz.' }, { status: 400 });
-        if (actorRole !== 'super_admin' && ['admin', 'super_admin'].includes(targetRole.role)) {
-            return NextResponse.json({ error: 'Yönetici hesaplarını yalnızca super admin silebilir.' }, { status: 403 });
-        }
-        const { error } = await serviceClient.auth.admin.deleteUser(userId);
-        if (error) {
-            console.error('Admin user deletion failed.', error);
-            return NextResponse.json({ error: 'Hesap silinemedi.' }, { status: 500 });
-        }
-        return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: 'Desteklenmeyen yönetim işlemi.' }, { status: 400 });

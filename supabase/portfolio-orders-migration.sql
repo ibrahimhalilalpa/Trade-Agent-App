@@ -405,7 +405,7 @@ begin
         raise exception 'Yetkisiz portföy sorgusu.';
     end if;
     if p_current_value is null or p_current_value < 0
-       or p_period is null or p_period not in ('day', 'week', 'month', 'all') then
+       or p_period is null or p_period not in ('day', 'week', 'month', 'year', 'all') then
         raise exception 'Geçersiz portföy performans aralığı.';
     end if;
 
@@ -424,7 +424,8 @@ begin
     v_cutoff_date := case p_period
         when 'day' then (now() at time zone 'UTC')::date
         when 'week' then (now() at time zone 'UTC')::date - 7
-        else (now() at time zone 'UTC')::date - 30
+        when 'month' then (now() at time zone 'UTC')::date - 30
+        else (now() at time zone 'UTC')::date - 365
     end;
 
     select total_value, created_at into v_baseline_value, v_baseline_at
@@ -436,6 +437,12 @@ begin
     limit 1;
 
     if v_baseline_value is null then
+        if p_period <> 'day' then
+            select coalesce(sum(cash_delta), 0) into v_cash_adjustments
+            from public.portfolio_transactions
+            where portfolio_id = v_portfolio_id and transaction_type = 'cash_adjustment';
+            return p_current_value - 100000 - v_cash_adjustments;
+        end if;
         return null;
     end if;
 

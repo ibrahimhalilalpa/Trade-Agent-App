@@ -475,10 +475,23 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan) !important
 .ds-auth-card .auth-form label { color: #cbd5e1; font-family: var(--font-geist-sans), sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0; }
 .ds-auth-card .auth-form input { width: 100%; border: 1px solid #334155 !important; border-radius: .6rem; background: #1e293b !important; color: #f8fafc !important; }
 .ds-auth-card .auth-form input:focus { border-color: #10b981 !important; box-shadow: 0 0 0 2px rgba(16, 185, 129, .2) !important; }
+.auth-password-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.auth-password-grid.has-confirmation { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ds-auth-card .auth-password-field { display: grid; align-content: start; align-self: start; gap: 6px; width: 100%; min-width: 0; margin: 0; }
+.ds-auth-card .auth-password-field > input { display: block; width: 100%; min-width: 0; height: 42px; box-sizing: border-box; margin: 0; }
+.ds-auth-card .auth-password-field > span { min-width: 0; }
 .ds-auth-card .auth-submit { width: 100%; border: 1px solid #059669; border-radius: .6rem; color: #fff; }
 .ds-auth-card .auth-note { display: flex; align-items: center; gap: 7px; color: #64748b; line-height: 1.6; }
 .ds-auth-card .auth-note svg { flex: 0 0 auto; color: #34d399; }
 .ds-auth-card .notice { border-radius: .65rem; }
+.auth-confirm-field { animation: auth-confirm-enter .2s ease-out both; }
+@keyframes auth-confirm-enter {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-confirm-field { animation: none; }
+}
 
 .ds-shell .stock-modal { border-color: #334155; border-radius: 1.25rem; background: #0f172a; box-shadow: 0 30px 100px rgba(0, 0, 0, .65); }
 .ds-shell .stock-modal .modal-header h2 { color: #f8fafc; font-size: 24px; font-weight: 800; overflow-wrap: anywhere; }

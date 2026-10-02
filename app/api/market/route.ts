@@ -21,7 +21,7 @@ export async function GET(req: Request) {
             const earlier = market.candles.at(-1 - days)?.close;
             return typeof earlier === 'number' && earlier !== 0 ? ((latestClose - earlier) / earlier) * 100 : null;
         };
-        const quote: MarketQuote = { symbol: market.symbol, name: `${market.symbol} BIST`, price: market.price, changePercent: market.changePercent, change1D: market.changePercent, change1W: returnAt(5), change1M: returnAt(21), volume: market.candles.at(-1)?.volume ?? 0, marketCap: 0, exchange: 'BIST', updatedAt: market.updatedAt, source: market.source === 'yahoo-finance' ? 'tradingview' : 'fallback' };
+        const quote: MarketQuote = { symbol: market.symbol, name: `${market.symbol} BIST`, price: market.price, changePercent: market.changePercent, change1D: market.changePercent, change1W: returnAt(5), change1M: returnAt(21), change1Y: market.source === 'yahoo-finance' ? market.history.return1Y : null, volume: market.candles.at(-1)?.volume ?? 0, marketCap: 0, exchange: 'BIST', updatedAt: market.updatedAt, source: market.source === 'yahoo-finance' ? 'tradingview' : 'fallback' };
         return NextResponse.json({ success: true, data: [quote], provider: market.source }, { headers: NO_STORE_HEADERS });
     }
     const limit = requestedLimit === 'all' ? 2_000 : Math.min(Math.max(Number(requestedLimit) || 20, 20), 500);
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-        const columns = ['name', 'description', 'close', 'change', 'change|1W', 'change|1M', 'change|1', 'change|5', 'change|15', 'change|60', 'change|240', 'volume', 'Value.Traded', 'market_cap_basic', 'exchange'];
+        const columns = ['name', 'description', 'close', 'change', 'change|1W', 'change|1M', 'change|1Y', 'change|1', 'change|5', 'change|15', 'change|60', 'change|240', 'volume', 'Value.Traded', 'market_cap_basic', 'exchange'];
         if (!columns.includes(periodColumn)) columns.push(periodColumn);
         type ScannerItem = { s?: string; d?: Array<string | number | null> };
         type ScannerPayload = { totalCount?: number; data?: ScannerItem[] };
@@ -63,13 +63,14 @@ export async function GET(req: Request) {
             const dayChange = values[columns.indexOf('change')];
             const weekChange = values[columns.indexOf('change|1W')];
             const monthChange = values[columns.indexOf('change|1M')];
+            const yearChange = values[columns.indexOf('change|1Y')];
             const intradayChange = (interval: string) => {
                 const value = values[columns.indexOf(`change|${interval}`)];
                 return typeof value === 'number' && Number.isFinite(value) ? value : null;
             };
             const volume = values[columns.indexOf('volume')];
             const tradedValue = values[columns.indexOf('Value.Traded')];
-            return [{ symbol, name: typeof values[1] === 'string' ? values[1] : symbol, price: values[2], changePercent: typeof periodChange === 'number' ? periodChange : 0, change1D: typeof dayChange === 'number' ? dayChange : null, change1W: typeof weekChange === 'number' ? weekChange : null, change1M: typeof monthChange === 'number' ? monthChange : null, change1m: intradayChange('1'), change5m: intradayChange('5'), change15m: intradayChange('15'), change1h: intradayChange('60'), change4h: intradayChange('240'), volume: typeof volume === 'number' ? volume : 0, tradedValue: typeof tradedValue === 'number' && Number.isFinite(tradedValue) ? tradedValue : null, marketCap: typeof values[columns.indexOf('market_cap_basic')] === 'number' ? values[columns.indexOf('market_cap_basic')] as number : 0, exchange: typeof values[columns.indexOf('exchange')] === 'string' ? values[columns.indexOf('exchange')] as string : 'BIST', updatedAt: new Date().toISOString(), source: 'tradingview' as const }];
+            return [{ symbol, name: typeof values[1] === 'string' ? values[1] : symbol, price: values[2], changePercent: typeof periodChange === 'number' ? periodChange : 0, change1D: typeof dayChange === 'number' ? dayChange : null, change1W: typeof weekChange === 'number' ? weekChange : null, change1M: typeof monthChange === 'number' ? monthChange : null, change1Y: typeof yearChange === 'number' ? yearChange : null, change1m: intradayChange('1'), change5m: intradayChange('5'), change15m: intradayChange('15'), change1h: intradayChange('60'), change4h: intradayChange('240'), volume: typeof volume === 'number' ? volume : 0, tradedValue: typeof tradedValue === 'number' && Number.isFinite(tradedValue) ? tradedValue : null, marketCap: typeof values[columns.indexOf('market_cap_basic')] === 'number' ? values[columns.indexOf('market_cap_basic')] as number : 0, exchange: typeof values[columns.indexOf('exchange')] === 'string' ? values[columns.indexOf('exchange')] as string : 'BIST', updatedAt: new Date().toISOString(), source: 'tradingview' as const }];
         });
         return NextResponse.json({ success: true, data: quotes.length ? quotes.slice(0, limit) : fallbackQuotes().slice(0, limit), provider: quotes.length ? 'tradingview' : 'fallback', totalCount, fetchedAt: new Date().toISOString() }, { headers: NO_STORE_HEADERS });
     } catch {

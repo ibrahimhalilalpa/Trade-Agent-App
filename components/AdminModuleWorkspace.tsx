@@ -22,7 +22,7 @@ type Announcement = { id: string; title: string; message: string; category: stri
 type AnnouncementReaders = { total: number; readCount: number; unreadCount: number; recipients: Array<{ userId: string; username: string; readAt: string | null }> };
 type NotificationTemplate = { event_key: string; title: string; message: string; category: string; severity: string; active: boolean; updated_at: string };
 type MarketCalendarDay = { trading_date: string; is_open: boolean; open_time: string | null; close_time: string | null; title: string; message: string | null; notification_sent: boolean; updated_at: string };
-type SystemData = { status: { database: string; cronEnabled: boolean; orderMonitorJob: { active?: boolean; schedule?: string; error?: string } | null; lastOrderMonitorRun: { status?: string; end_time?: string; return_message?: string; error?: string } | null; vaultTokenConfigured: boolean; vaultUrlConfigured: boolean; serviceRoleConfigured: boolean }; announcements: Announcement[]; notificationTemplates: NotificationTemplate[]; audit: Array<{ id: string; event_type: string; description: string; created_at: string; user_id: string; user_email: string; display_name: string }> };
+type SystemData = { status: { database: string; cronEnabled: boolean; orderMonitorJob: { active?: boolean; schedule?: string; error?: string } | null; lastOrderMonitorRun: { status?: string; end_time?: string; return_message?: string; error?: string } | null; vaultTokenConfigured: boolean; vaultUrlConfigured: boolean; serviceRoleConfigured: boolean }; announcements: Announcement[]; notificationTemplates: NotificationTemplate[]; audit: Array<{ id: string; event_type: string; description: string; created_at: string; user_id: string; user_email: string; display_name: string; actor_name: string }> };
 
 const formatMoney = (value: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 }).format(Number(value) || 0);
 const formatDate = (value: string) => new Date(value).toLocaleString('tr-TR');
@@ -487,7 +487,7 @@ export default function AdminModuleWorkspace({ section }: { section: Section }) 
                             </button>}
                         </div>
                     </section>
-                    <section className={`${panelClass} min-w-0`}><h2 className="mb-4 flex items-center gap-2 font-bold text-white"><Clock3 className="h-4 w-4 text-emerald-400" />Global audit akışı</h2><div className="max-h-[620px] space-y-2 overflow-y-auto">{systemData?.audit.map((item) => <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div className="min-w-0"><strong className="block truncate text-xs text-slate-200">{item.display_name || 'Kullanıcı'}</strong><span className="block truncate text-[10px] text-slate-500">{item.user_email || item.user_id}</span></div><div className="flex shrink-0 items-center gap-2"><StatusBadge status={item.event_type} /><time className="text-[10px] text-slate-600">{formatDate(item.created_at)}</time></div></div><p className="mt-2 text-xs text-slate-300">{item.description}</p></article>)}</div></section>
+                    <section className={`${panelClass} min-w-0`}><h2 className="mb-4 flex items-center gap-2 font-bold text-white"><Clock3 className="h-4 w-4 text-emerald-400" />Global audit akışı</h2><div className="max-h-[620px] space-y-2 overflow-y-auto">{systemData?.audit.map((item) => <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div className="min-w-0"><strong className="block truncate text-xs text-slate-200">{item.display_name || 'Kullanıcı'}</strong><span className="block truncate text-[10px] text-slate-500">{item.user_email || item.user_id}</span>{item.actor_name && <span className="mt-0.5 block truncate text-[10px] text-emerald-400">İşlemi yapan: {item.actor_name}</span>}</div><div className="flex shrink-0 items-center gap-2"><StatusBadge status={item.event_type} /><time className="text-[10px] text-slate-600">{formatDate(item.created_at)}</time></div></div><p className="mt-2 text-xs text-slate-300">{item.description}</p></article>)}</div></section>
                 </div>
                 <section className={`${panelClass} space-y-4`}>
                     <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 font-bold text-white"><Bell className="h-4 w-4 text-emerald-400" />Otomatik bildirim kuralları</h2><p className="mt-1 text-xs text-slate-500">Kayıt, emir, alış/satış, ders tamamlama ve fiyat alarmı olaylarında gönderilen kullanıcı bildirimlerini yönetin. Mevcut olay şablonlarını aşağıdaki kalemlerden düzenleyin; buton yalnızca eksik uygulama olaylarının şablonunu oluşturur.</p></div><button type="button" onClick={startNewNotificationTemplate} disabled={loading || !systemData} title="Uygulamada tanımlı olup şablonu eksik olan bir olay ekler; yeni otomatik olaylar önce uygulama koduna eklenmelidir." className={secondaryButton}><Plus className="h-4 w-4" />Eksik olay şablonu ekle</button></div>
@@ -531,12 +531,18 @@ export default function AdminModuleWorkspace({ section }: { section: Section }) 
 
 function StatusBadge({ status }: { status: string }) {
     const normalized = status.toLowerCase();
+    const labels: Record<string, string> = {
+        account_appeal_submitted: 'Hesap itirazı',
+        account_appeal_decided: 'Hesap itirazı kararı',
+        forum_appeal_submitted: 'Forum itirazı',
+        forum_appeal_decided: 'Forum itirazı kararı',
+    };
     const tone = ['active', 'published', 'filled', 'completed', 'buy', 'success', 'read'].some((word) => normalized.includes(word))
         ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
         : ['cancel', 'failed', 'error', 'hidden', 'critical'].some((word) => normalized.includes(word))
             ? 'border-rose-500/20 bg-rose-500/10 text-rose-300'
             : 'border-amber-500/20 bg-amber-500/10 text-amber-300';
-    return <span className={`inline-flex max-w-full items-center rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}>{status.replaceAll('_', ' ')}</span>;
+    return <span className={`inline-flex max-w-full items-center rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}>{labels[normalized] ?? status.replaceAll('_', ' ')}</span>;
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return <label className="block min-w-0 space-y-1.5"><span className="text-[11px] font-semibold text-slate-400">{label}</span>{children}</label>;

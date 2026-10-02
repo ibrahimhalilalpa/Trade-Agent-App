@@ -9,8 +9,17 @@ export function translateAuthError(error: AuthErrorLike | string | null | undefi
         return 'E-posta adresi veya parola hatalı.';
     }
     if (/email_not_confirmed|email not confirmed/.test(detail)) return 'E-posta adresinizi doğruladıktan sonra giriş yapabilirsiniz.';
+    if (/user_banned|user is banned|user account is banned|banned_until/.test(detail)) {
+        return 'Bu hesap önceki dondurma uygulamasından kalan bir giriş engeline sahip. Supabase SQL Editor’da supabase/account-freeze-login-fix-migration.sql dosyasını çalıştırıp tekrar giriş yapın.';
+    }
     if (/user already registered|user_already_exists|already been registered/.test(detail)) return 'Bu e-posta adresiyle bir hesap zaten kayıtlı.';
     if (/user not found|user_not_found/.test(detail)) return 'Bu e-posta adresiyle eşleşen bir hesap bulunamadı.';
+    if (/error sending confirmation email|failed to send.*(?:confirmation|verification) email|smtp|email delivery/.test(detail)) {
+        return 'Kayıt işlemi doğrulama e-postası gönderilirken başarısız oldu. Supabase Dashboard > Authentication > SMTP Settings bölümündeki etkin SMTP sağlayıcısının bilgilerini kontrol edin. İptal edilmiş veya geçersiz bir SMTP parolası kullanılıyorsa gönderim başarısız olur.';
+    }
+    if (/database error saving new user|database error creating user|error creating user|trigger.*(?:failed|error)/.test(detail)) {
+        return 'Kayıt işlemi veritabanında tamamlanamadı. Supabase Dashboard > Logs bölümündeki Auth ve Postgres kayıtlarını kontrol edin; kullanıcı oluşturma trigger’ı veya gerekli migration’lar hata veriyor olabilir.';
+    }
     if (/over_email_send_rate_limit|email rate limit exceeded|too many requests|rate limit/.test(detail)) {
         return 'Çok fazla deneme yapıldı. Lütfen biraz bekleyip yeniden deneyin.';
     }

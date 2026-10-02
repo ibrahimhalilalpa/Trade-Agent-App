@@ -15,6 +15,7 @@ export const FORUM_CATEGORIES = [
     ['strateji_egitim', 'Strateji & Eğitim'],
     ['makro_ekonomi', 'Makro Ekonomi'],
 ] as const;
+export type ForumCategoryOption = { slug: string; label: string; sort_order: number };
 
 type TopicInput = {
     title: string;
@@ -31,10 +32,12 @@ const inputClass = 'w-full rounded-xl border border-slate-700 bg-slate-800/80 px
 const LEGAL_DISCLAIMER = 'Yasal Uyarı: Burada yer alan yatırım bilgi, yorum ve tavsiyeleri yatırım danışmanlığı kapsamında değildir. Yer alan görüşler kişisel analizlere dayanmaktadır.';
 
 export default function CreateTopicModal({
+    categories = FORUM_CATEGORIES.map(([slug, label], index) => ({ slug, label, sort_order: (index + 1) * 10 })),
     initialSymbol = '',
     onClose,
     onCreated,
 }: {
+    categories?: ForumCategoryOption[];
     initialSymbol?: string;
     onClose: () => void;
     onCreated: (topicId: string) => void;
@@ -52,6 +55,16 @@ export default function CreateTopicModal({
     const [symbolSearchError, setSymbolSearchError] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    const [banStatus, setBanStatus] = useState<{ banned: boolean; ban_until: string | null; appeal: { id: string; subject: string; details: string; status: string; admin_note: string | null; attachment_url: string | null } | null } | null>(null);
+    const [appealDetails, setAppealDetails] = useState('');
+    const [appealSubject, setAppealSubject] = useState('Topluluk kısıtlamasına itiraz');
+    const [appealFile, setAppealFile] = useState<File | null>(null);
+    const [appealBusy, setAppealBusy] = useState(false);
+    const selectedCategory = categories.some((item) => item.slug === category)
+        ? category
+        : (initialSymbol ? categories.find((item) => item.slug === 'hisse_analiz')?.slug : null)
+            ?? categories[0]?.slug
+            ?? '';
 
     useEffect(() => {
         const query = symbol.trim();
@@ -76,6 +89,49 @@ export default function CreateTopicModal({
             controller.abort();
         };
     }, [initialSymbol, symbol]);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        void fetch('/api/forum/appeals', { signal: controller.signal, cache: 'no-store' })
+            .then(async (response) => {
+                const payload = await response.json() as { data?: typeof banStatus; error?: string };
+                if (!response.ok || !payload.data) throw new Error(payload.error ?? 'Forum erişim durumu yüklenemedi.');
+                setBanStatus(payload.data);
+            })
+            .catch((cause) => {
+                if (cause instanceof DOMException && cause.name === 'AbortError') return;
+                setError(cause instanceof Error ? cause.message : 'Forum erişim durumu yüklenemedi.');
+            });
+        return () => controller.abort();
+    }, []);
+
+    const submitAppeal = async () => {
+        if (appealDetails.trim().length < 20 || appealDetails.trim().length > 1000) {
+            setError('İtiraz açıklaması 20-1000 karakter arasında olmalıdır.');
+            return;
+        }
+        setAppealBusy(true);
+        setError('');
+        try {
+            const form = new FormData();
+            form.set('subject', appealSubject);
+            form.set('details', appealDetails);
+            if (appealFile) form.set('file', appealFile);
+            const response = await fetch('/api/forum/appeals', {
+                method: 'POST',
+                body: form,
+            });
+            const payload = await response.json() as { data?: { id: string; subject: string; details: string; status: string; attachment_url: string | null }; error?: string };
+            if (!response.ok || !payload.data) throw new Error(payload.error ?? 'İtiraz gönderilemedi.');
+            setBanStatus((current) => current ? { ...current, appeal: { ...payload.data!, admin_note: null } } : current);
+            setAppealDetails('');
+            setAppealFile(null);
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'İtiraz gönderilemedi.');
+        } finally {
+            setAppealBusy(false);
+        }
+    };
 
     const uploadImage = async (file: File) => {
         const form = new FormData();
@@ -145,7 +201,7 @@ export default function CreateTopicModal({
             const input: TopicInput = {
                 title: cleanText(title.trim()),
                 content: cleanText(content.trim()),
-                category,
+                category: selectedCategory,
                 related_symbol: symbol.trim() ? symbol.trim().toUpperCase() : null,
                 cover_image_url: coverImageUrl,
                 images: imageUrls,
@@ -174,6 +230,19 @@ export default function CreateTopicModal({
                 <button type="button" onClick={onClose} disabled={busy} aria-label="Pencereyi kapat" className="rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-400 transition hover:text-white"><X size={18} /></button>
             </header>
             <form onSubmit={(event) => void create(event)} className="flex min-h-0 flex-1 flex-col">
+                {banStatus?.banned && <section className="mx-5 mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 sm:mx-7">
+                    <h3 className="text-sm font-bold text-rose-300">Forum paylaşım erişiminiz kısıtlı</h3>
+                    <p className="mt-1 text-xs leading-5 text-slate-300">{banStatus.ban_until ? `Kısıtlama ${new Date(banStatus.ban_until).toLocaleString('tr-TR')} tarihinde sona erecek.` : 'Kısıtlama süresizdir.'}</p>
+                    {banStatus.appeal && ['pending', 'reviewing'].includes(banStatus.appeal.status)
+                        ? <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3"><p className="text-xs font-semibold text-amber-300">İtirazınız incelemede: {banStatus.appeal.subject}</p><p className="mt-1 line-clamp-2 text-xs text-slate-400">{banStatus.appeal.details}</p><p className="mt-2 text-[10px] text-slate-400">İnceleme tamamlanana kadar yeni itiraz hakkı kullanılamaz. Sonuca göre yeniden başvuru hakkı değerlendirilecektir.</p></div>
+                        : <div className="mt-3 space-y-2">
+                            <label htmlFor="ban-appeal-subject" className="block text-xs font-semibold text-slate-200">Konu (3-120 karakter)</label><input id="ban-appeal-subject" value={appealSubject} onChange={(event) => setAppealSubject(event.target.value)} minLength={3} maxLength={120} className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white" />
+                            <label htmlFor="ban-appeal-details" className="block text-xs font-semibold text-slate-200">İtiraz açıklaması (20-1000 karakter)</label><textarea id="ban-appeal-details" value={appealDetails} onChange={(event) => setAppealDetails(event.target.value)} minLength={20} maxLength={1000} rows={3} className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-emerald-500/40" placeholder="Yasak kararının yeniden değerlendirilmesini istediğiniz nedeni açıklayın." /><p className="text-right text-[10px] text-slate-500">{appealDetails.length}/1000</p>
+                            <label className="block text-[10px] font-semibold text-slate-300">İsteğe bağlı görsel · en fazla 5 MB<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => setAppealFile(event.target.files?.[0] ?? null)} className="mt-1 block w-full text-[10px] text-slate-400" /></label>
+                            {appealFile && <p className="truncate text-[10px] text-slate-400">{appealFile.name}</p>}
+                            <button type="button" disabled={appealBusy || appealDetails.trim().length < 20 || appealSubject.trim().length < 3} onClick={() => void submitAppeal()} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{appealBusy ? 'Gönderiliyor…' : 'İtiraz gönder'}</button>
+                        </div>}
+                </section>}
                 <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-5 sm:p-7 lg:grid-cols-[minmax(0,1.45fr)_minmax(270px,.85fr)]">
                     <div className="min-w-0 space-y-5">
                         <section className="space-y-4">
@@ -191,7 +260,7 @@ export default function CreateTopicModal({
                     <aside className="min-w-0 space-y-4">
                         <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
                             <h3 className="text-xs font-bold text-white">Gönderi bilgileri</h3>
-                            <label className="block space-y-1.5 text-[11px] font-medium text-slate-400">Kategori<select className={`${inputClass} bg-slate-950`} value={category} onChange={(event) => setCategory(event.target.value)}>{FORUM_CATEGORIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                            <label className="block space-y-1.5 text-[11px] font-medium text-slate-400">Kategori<select className={`${inputClass} bg-slate-950`} value={selectedCategory} onChange={(event) => setCategory(event.target.value)}>{categories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}</select></label>
                             <div className="relative space-y-1.5"><label htmlFor="topic-symbol" className="block text-[11px] font-medium text-slate-400">Hisse sembolü <span className="text-slate-600">(isteğe bağlı)</span></label><input id="topic-symbol" role="combobox" aria-autocomplete="list" aria-expanded={symbolSuggestions.length > 0} aria-controls="topic-symbol-options" className={`${inputClass} bg-slate-950`} maxLength={20} value={symbol} onChange={(event) => { setSymbol(event.target.value.toUpperCase().replace(/[^A-Z0-9 .&-]/g, '')); setSymbolSuggestions([]); setSymbolSearchError(''); }} placeholder="Şirket adı veya kod" />
                                 {symbolSuggestions.length > 0 && <ul id="topic-symbol-options" role="listbox" className="absolute inset-x-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-xl">{symbolSuggestions.map((option) => <li key={option.symbol} role="option" aria-selected={symbol === option.symbol}><button type="button" onClick={() => { setSymbol(option.symbol); setSymbolSuggestions([]); }} className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left hover:bg-slate-800"><strong className="text-xs text-emerald-300">{option.symbol}</strong><span className="min-w-0 truncate text-right text-xs text-slate-300">{option.name}</span></button></li>)}</ul>}
                                 {symbolSearchError && <p role="status" className="text-[10px] text-amber-300">{symbolSearchError}</p>}
@@ -227,7 +296,7 @@ export default function CreateTopicModal({
                 {error && <p role="alert" className="mx-5 mb-3 rounded-lg border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-300 sm:mx-7">{error}</p>}
                 <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 bg-slate-900/80 px-5 py-4 sm:px-7">
                     <p className="hidden text-[10px] text-slate-500 sm:block">Paylaşım öncesi başlık, etiket ve görünürlük ayarlarını kontrol edin.</p>
-                    <div className="ml-auto flex gap-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-700">İptal</button><button disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-900/20 transition hover:bg-emerald-500 disabled:opacity-50">{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? 'Paylaşılıyor…' : 'Konuyu paylaş'}</button></div>
+                    <div className="ml-auto flex gap-2"><button type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-700">İptal</button><button disabled={busy || banStatus?.banned} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-900/20 transition hover:bg-emerald-500 disabled:opacity-50">{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? 'Paylaşılıyor…' : banStatus?.banned ? 'Paylaşım kısıtlı' : 'Konuyu paylaş'}</button></div>
                 </footer>
             </form>
         </section>

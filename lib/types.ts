@@ -61,6 +61,7 @@ export interface MarketQuote {
     change1D?: number | null;
     change1W?: number | null;
     change1M?: number | null;
+    change1Y?: number | null;
     change1m?: number | null;
     change5m?: number | null;
     change15m?: number | null;

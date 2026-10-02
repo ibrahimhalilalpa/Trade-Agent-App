@@ -50,12 +50,20 @@ export async function GET() {
     const { data: activity, error: activityError } = await supabase.from('user_activity_logs')
         .select('id, event_type, description, created_at, metadata')
         .eq('user_id', user.id)
-        .in('event_type', ['login', 'logout', 'profile_updated', 'password_changed', 'password_failed', 'password_reset_requested'])
+        .in('event_type', ['login', 'logout', 'profile_updated', 'password_changed', 'password_failed', 'password_reset_requested', 'account_freeze_requested', 'account_reactivated', 'account_deletion_requested', 'admin_account_status'])
         .order('created_at', { ascending: false }).limit(60);
     if (activityError) {
         console.error('Profile activity lookup failed.', activityError);
         return NextResponse.json({ error: isMissingSchema(activityError) ? PROFILE_SCHEMA_ERROR : 'Hesap hareketleri yüklenemedi.' }, { status: 500 });
     }
+    const activityWithoutDuplicateLogouts = (activity ?? []).filter((item, index, records) => {
+        if (item.event_type !== 'logout') return true;
+        const itemTime = new Date(item.created_at).getTime();
+        return !records.slice(0, index).some((previous) =>
+            previous.event_type === 'logout'
+            && Math.abs(itemTime - new Date(previous.created_at).getTime()) <= 2 * 60_000,
+        );
+    });
     if (roleResult.error || rankResult.error || leaderboardResult.error) {
         console.error('Profile rank metadata lookup failed.', roleResult.error ?? rankResult.error ?? leaderboardResult.error);
         return NextResponse.json({ error: 'Rol ve seviye bilgileri yüklenemedi. RBAC migration durumunu kontrol edin.' }, { status: 500 });
@@ -72,7 +80,7 @@ export async function GET() {
             rank: rankResult.data,
             leaderboardRank: ((leaderboardResult.data as PublicLeaderboardRow[] | null) ?? [])
                 .findIndex((entry) => entry.user_id === user.id) + 1 || null,
-            activity: (activity ?? [])
+            activity: activityWithoutDuplicateLogouts
                 .filter((item) => !isPrivatePreferenceAudit(item.metadata))
                 .slice(0, 30)
                 .map((item) => ({

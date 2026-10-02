@@ -12,6 +12,7 @@ type PageSize = '20' | '50' | '100' | 'all';
 type Entry = {
     user_id: string;
     display_name: string;
+    username?: string | null;
     trader_rank: string;
     xp: number;
     pnl_percent: number;
@@ -140,7 +141,7 @@ export default function LeaderboardWorkspace() {
                                 <tbody className="divide-y divide-slate-800/70">
                                     {pageEntries.map((entry, index) => <tr key={entry.user_id} className={entry.is_self ? 'bg-emerald-500/10 shadow-[inset_3px_0_0_0_rgba(52,211,153,0.9)]' : 'hover:bg-slate-800/40'}>
                                         <td className={`py-4 px-3 font-mono ${entry.is_self ? 'font-bold text-emerald-300' : 'text-slate-400'}`}>{entry.rank_position === null ? 'Özel' : `#${entry.rank_position ?? startIndex + index + 1}`}</td>
-                                        <td className={`py-4 px-3 font-semibold ${entry.is_self ? 'text-emerald-100' : 'text-white'}`}><span className="inline-flex items-center gap-2.5"><ForumAvatar avatarUrl={entry.avatar_url} gender={entry.gender} username={entry.display_name} size={36} className="h-9 w-9 shrink-0 rounded-full border border-slate-700 object-cover" /><span className="inline-flex flex-wrap items-center gap-2">{entry.display_name}{entry.is_self && <span className="rounded-full border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-1 text-[10px] font-extrabold text-emerald-200">SEN · SIRAN</span>}</span></span></td>
+                                        <td className={`py-4 px-3 font-semibold ${entry.is_self ? 'text-emerald-100' : 'text-white'}`}><Link href={entry.username ? `/profile/${encodeURIComponent(entry.username)}` : `/leaderboard/${entry.user_id}?period=${period}`} aria-label={`${entry.display_name} profilini aç`} className="inline-flex items-center gap-2.5 rounded-lg outline-none transition hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-500"><ForumAvatar avatarUrl={entry.avatar_url} gender={entry.gender} username={entry.display_name} size={36} className="h-9 w-9 shrink-0 rounded-full border border-slate-700 object-cover" /><span className="inline-flex flex-wrap items-center gap-2">{entry.display_name}{entry.is_self && <span className="rounded-full border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-1 text-[10px] font-extrabold text-emerald-200">SEN · SIRAN</span>}</span></Link></td>
                                         <td className="py-4 px-3"><span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-300"><Award className="w-3.5 h-3.5" />{entry.trader_rank} · {entry.xp} XP</span></td>
                                         <td className={`py-4 px-3 text-right font-bold ${entry.pnl_percent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{entry.pnl_percent >= 0 ? '+' : ''}{Number(entry.pnl_percent).toFixed(2)}%</td>
                                         <td className="py-4 px-3 text-right font-semibold">{(() => {

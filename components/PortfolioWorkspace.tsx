@@ -9,7 +9,7 @@ import { getBistPriceStep } from '@/lib/bist-market';
 import type { PortfolioOrder, PortfolioSnapshot, PortfolioState, PortfolioTrade, PriceAlertEvent } from '@/lib/types';
 import { useAppPreferences } from '@/components/AppProviders';
 
-type Range = 'day' | 'week' | 'month' | 'all';
+type Range = 'day' | 'week' | 'month' | 'year' | 'all';
 type LedgerEntry =
     | { kind: 'trade'; data: PortfolioTrade; createdAt: string }
     | { kind: 'alert'; data: PriceAlertEvent; createdAt: string };
@@ -38,7 +38,7 @@ function dayLabel(value: string): string {
 
 function historyPoints(snapshots: PortfolioSnapshot[], range: Range): PortfolioSnapshot[] {
     if (range === 'all' || !snapshots.length) return snapshots;
-    const days = range === 'day' ? 2 : range === 'week' ? 7 : 30;
+    const days = range === 'day' ? 2 : range === 'week' ? 7 : range === 'month' ? 30 : 365;
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
     return snapshots.filter((snapshot) => new Date(snapshot.createdAt).getTime() >= cutoff);
 }
@@ -297,7 +297,7 @@ export default function PortfolioWorkspace() {
         : null;
     const ranges: Array<{ id: Range; label: string }> = [
         { id: 'day', label: 'Günlük' }, { id: 'week', label: 'Haftalık' },
-        { id: 'month', label: 'Aylık' }, { id: 'all', label: 'Tümü' },
+        { id: 'month', label: 'Aylık' }, { id: 'year', label: 'Yıllık' }, { id: 'all', label: 'Tümü' },
     ];
 
     return <main className="app-shell ds-shell"><div className="app-container ds-container portfolio-workspace">

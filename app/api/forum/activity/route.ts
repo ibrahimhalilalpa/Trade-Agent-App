@@ -6,13 +6,19 @@ export async function GET() {
     const auth = await requireForumUser();
     if (auth.response) return auth.response;
     const userId = auth.user.id;
-    const [votesResult, followerRows, followingRows, commentRows] = await Promise.all([
+    const [votesResult, followerRows, followingRows, commentRows, reportsResult, moderationActionsResult] = await Promise.all([
         auth.client.from('topic_votes').select('topic_id, comment_id, vote, created_at').eq('user_id', userId),
         auth.client.from('user_follows').select('follower_id, created_at').eq('followed_id', userId).order('created_at', { ascending: false }).limit(500),
         auth.client.from('user_follows').select('followed_id, created_at').eq('follower_id', userId).order('created_at', { ascending: false }).limit(500),
         auth.client.from('forum_comments').select('id, topic_id, content, created_at, helpful_count, unhelpful_count').eq('user_id', userId).order('created_at', { ascending: false }).limit(1000),
+        auth.client.from('forum_reports')
+            .select('id, status, reason, details, reporter_resolution_summary, created_at, resolved_at, target_type, target_id, target_topic_id, target_title, content_snapshot')
+            .eq('reporter_id', userId).order('created_at', { ascending: false }).limit(200),
+        auth.client.from('forum_moderation_actions')
+            .select('id, report_id, action, note, created_at')
+            .eq('user_id', userId).order('created_at', { ascending: false }).limit(200),
     ]);
-    const firstError = votesResult.error ?? followerRows.error ?? followingRows.error ?? commentRows.error;
+    const firstError = votesResult.error ?? followerRows.error ?? followingRows.error ?? commentRows.error ?? reportsResult.error ?? moderationActionsResult.error;
     if (firstError) return databaseError(firstError, 'Topluluk etkinlikleriniz yüklenemedi.');
 
     const votes = votesResult.data ?? [];
@@ -53,6 +59,8 @@ export async function GET() {
             comment: vote.comment_id ? commentById.get(vote.comment_id) ?? null : null,
         })),
         comments: commentRows.data ?? [],
+        reports: reportsResult.data ?? [],
+        moderationActions: moderationActionsResult.data ?? [],
         followers: (followerRows.data ?? []).flatMap((row) => {
             const profile = profileById.get(row.follower_id);
             return profile ? [{ ...profile, created_at: row.created_at }] : [];

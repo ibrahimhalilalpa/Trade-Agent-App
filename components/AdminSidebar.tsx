@@ -1,6 +1,6 @@
 'use client';
 
-import { Activity, BellRing, BookOpen, Boxes, CircleDollarSign, LayoutDashboard, Menu, MessageSquare, ScrollText, Settings2, Shield, Users, X } from 'lucide-react';
+import { Activity, BellRing, BookOpen, Boxes, CircleDollarSign, HelpCircle, LayoutDashboard, Menu, MessageSquare, ScrollText, Settings2, Shield, Users, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -13,6 +13,7 @@ const ITEMS = [
     { href: '/admin/balances', label: 'Bakiye İşlemleri', icon: CircleDollarSign, superAdminOnly: true },
     { href: '/admin/academy', label: 'Akademi İçerikleri', icon: BookOpen },
     { href: '/admin/community', label: 'Topluluk & Forum', icon: MessageSquare },
+    { href: '/admin/support', label: 'Yardım & İtirazlar', icon: HelpCircle },
     { href: '/admin/system', label: 'Sistem & Ayarlar', icon: Settings2 },
 ];
 

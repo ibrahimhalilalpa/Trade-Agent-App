@@ -155,7 +155,7 @@ export async function GET(request: Request) {
     }, { onConflict: 'portfolio_id,snapshot_date' });
     if (snapshotWriteError) console.error('Portfolio snapshot refresh failed.', snapshotWriteError);
     const requestedPeriod = new URL(request.url).searchParams.get('pnlPeriod');
-    const pnlPeriod = requestedPeriod === 'week' || requestedPeriod === 'month' || requestedPeriod === 'all'
+    const pnlPeriod = requestedPeriod === 'week' || requestedPeriod === 'month' || requestedPeriod === 'year' || requestedPeriod === 'all'
         ? requestedPeriod : 'day';
     const [tradeResult, snapshotResult, orderResult, orderEventsResult, priceAlertEventsResult, realizedResult, periodPnlResult, reservedCashResult] = await Promise.all([
         supabase.from('portfolio_transactions').select('id, symbol, transaction_type, quantity, price, cash_delta, realized_pnl, commission_amount, slippage_amount, created_at')

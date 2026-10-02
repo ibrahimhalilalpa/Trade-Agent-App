@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { LoaderCircle, ShieldAlert } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -9,6 +9,7 @@ import { translateAuthError } from '@/lib/auth-errors';
 import { showError } from '@/lib/ui-alerts';
 
 export default function AuthCallbackPage() {
+    const started = useRef(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -16,6 +17,8 @@ export default function AuthCallbackPage() {
     }, [error]);
 
     useEffect(() => {
+        if (started.current) return;
+        started.current = true;
         let active = true;
 
         const completeAuthentication = async () => {
@@ -33,7 +36,7 @@ export default function AuthCallbackPage() {
                 ?? hash.get('error_description')
                 ?? hash.get('error');
             if (callbackError) {
-                setError(translateAuthError(decodeURIComponent(callbackError.replace(/\+/g, ' ')), 'Doğrulama bağlantısı geçersiz veya süresi dolmuş. Yeni bir bağlantı isteyin.'));
+                setError(translateAuthError(callbackError, 'Doğrulama bağlantısı geçersiz veya süresi dolmuş. Yeni bir bağlantı isteyin.'));
                 return;
             }
 
@@ -59,22 +62,43 @@ export default function AuthCallbackPage() {
                 authError = result.error;
             }
 
-            if (authError) {
-                setError(translateAuthError(authError, 'Oturum doğrulanamadı. Yeni bir bağlantı isteyin.'));
-                return;
-            }
-
             const { data, error: sessionError } = await client.auth.getSession();
             if (sessionError || !data.session) {
+                if (authError) {
+                    setError(translateAuthError(authError, 'Oturum doğrulanamadı. Yeni bir bağlantı isteyin.'));
+                    return;
+                }
                 setError(translateAuthError(sessionError?.message, 'Bağlantı geçersiz veya süresi dolmuş. Yeni bir bağlantı isteyin.'));
                 return;
             }
 
-            const requestedPath = safeInternalPath(query.get('next'), '/lists', window.location.origin);
+            const deleteAccount = query.get('deleteAccount') === '1';
+            if (deleteAccount) {
+                const deleteToken = query.get('deleteToken');
+                if (!deleteToken) {
+                    setError('Silme doğrulama bağlantısı eksik. Hesap silinmedi; profil sayfasından yeni bir bağlantı isteyin.');
+                    return;
+                }
+                const response = await fetch('/api/profile/account', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: deleteToken }),
+                });
+                const payload = await response.json() as { error?: string };
+                if (!response.ok) {
+                    setError(payload.error ?? 'E-posta doğrulandı ancak hesap silinemedi.');
+                    return;
+                }
+                await client.auth.signOut({ scope: 'local' });
+                window.location.replace('/auth?accountDeleted=1');
+                return;
+            }
+
+            const requestedPath = safeInternalPath(query.get('next'), type === 'signup' ? '/profile' : '/lists', window.location.origin);
             const isRecovery = type === 'recovery' || requestedPath.includes('recovery=1');
             const destination = isRecovery
                 ? '/profile?recovery=1'
-                : requestedPath === '/lists' && type === 'invite'
+                : (requestedPath === '/lists' || requestedPath === '/profile') && (type === 'invite' || type === 'signup')
                     ? '/profile'
                     : requestedPath;
             window.location.replace(destination);

@@ -54,6 +54,14 @@ export default function AppProviders({ children }: { children: ReactNode }) {
     const themeRequestId = useRef(0);
 
     useEffect(() => {
+        const currentUrl = new URL(window.location.href);
+        if (currentUrl.searchParams.get('accountReactivated') !== '1') return;
+        toast.success('Hesabınız yeniden aktifleşti. Yeniden hoş geldiniz!');
+        currentUrl.searchParams.delete('accountReactivated');
+        window.history.replaceState(window.history.state, '', `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
+    }, []);
+
+    useEffect(() => {
         const storedTheme = window.localStorage.getItem('trade-agent-theme');
         const initialTheme: Theme = storedTheme === 'light' ? 'light' : 'dark';
         document.documentElement.dataset.theme = initialTheme;
@@ -64,6 +72,7 @@ export default function AppProviders({ children }: { children: ReactNode }) {
         if (!client) return;
         let sessionUserId: string | null = null;
         let logoutInProgress = false;
+        let logoutAttemptedUserId: string | null = null;
         let lastActivityWrite = 0;
         let volatileLastActivity: number | null = null;
         let storageWarningShown = false;
@@ -99,8 +108,9 @@ export default function AppProviders({ children }: { children: ReactNode }) {
             }
         };
         const expireSession = async (userId: string) => {
-            if (logoutInProgress || sessionUserId !== userId) return;
+            if (logoutInProgress || logoutAttemptedUserId === userId || sessionUserId !== userId) return;
             logoutInProgress = true;
+            logoutAttemptedUserId = userId;
             try {
                 void fetch('/api/profile/activity', {
                     method: 'POST',
@@ -141,8 +151,10 @@ export default function AppProviders({ children }: { children: ReactNode }) {
                 sessionUserId = userId;
                 lastActivityWrite = 0;
                 volatileLastActivity = null;
+                logoutAttemptedUserId = null;
             }
             if (signedIn) {
+                logoutAttemptedUserId = null;
                 const now = Date.now();
                 writeLastActivity(userId, now);
                 lastActivityWrite = now;
@@ -162,6 +174,7 @@ export default function AppProviders({ children }: { children: ReactNode }) {
             sessionUserId = null;
             lastActivityWrite = 0;
             logoutInProgress = false;
+            logoutAttemptedUserId = null;
         };
         const onActivity = () => recordActivity();
         const onVisibilityChange = () => {

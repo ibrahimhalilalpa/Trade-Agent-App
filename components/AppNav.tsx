@@ -18,6 +18,7 @@ const LINKS = [
     { href: '/leaderboard', label: 'Liderlik' },
     { href: '/education', label: 'Akademi' },
     { href: '/forum', label: 'Topluluk' },
+    { href: '/support', label: 'Yardım' },
 ];
 
 export default function AppNav() {

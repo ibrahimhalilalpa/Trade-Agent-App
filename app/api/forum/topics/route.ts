@@ -72,6 +72,10 @@ export async function POST(request: Request) {
     if (isApiError(title)) return apiValidationError(title);
     if (isApiError(content)) return apiValidationError(content);
     if (!isCategory(body.category)) return apiError('Kategori geçersiz.', 400, 'INVALID_CATEGORY');
+    const { data: categoryRecord, error: categoryError } = await auth.client.from('forum_categories')
+        .select('slug').eq('slug', body.category).eq('is_active', true).maybeSingle();
+    if (categoryError) return databaseError(categoryError, 'Topluluk kategorisi doğrulanamadı.');
+    if (!categoryRecord) return apiError('Seçilen kategori artık kullanılamıyor.', 400, 'INVALID_CATEGORY');
     const relatedSymbol = normalizeSymbol(body.related_symbol);
     if (isApiError(relatedSymbol)) return apiValidationError(relatedSymbol);
     const coverImageUrl = safeHttpsUrl(body.cover_image_url, 'Kapak görseli');

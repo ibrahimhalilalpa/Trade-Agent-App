@@ -42,12 +42,17 @@ export async function GET() {
             notificationTemplates: notificationTemplates.data ?? [],
             audit: auditRows.map((item) => {
                 const user = userById.get(item.user_id);
+                const actorId = item.metadata && typeof item.metadata === 'object' && 'actor_id' in item.metadata
+                    ? item.metadata.actor_id
+                    : null;
+                const actor = typeof actorId === 'string' ? userById.get(actorId) : undefined;
                 const isPrivacyChange = isPrivatePreferenceAudit(item.metadata);
                 return {
                     ...item,
                     event_type: isPrivacyChange ? 'privacy_preference_changed' : item.event_type,
                     user_email: user?.email ?? '',
                     display_name: user?.displayName ?? '',
+                    actor_name: actor?.displayName || actor?.email || '',
                 };
             }),
         },

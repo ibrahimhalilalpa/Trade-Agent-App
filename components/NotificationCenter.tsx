@@ -42,6 +42,21 @@ const CATEGORY_LABELS: Record<Category, string> = {
 const CATEGORY_ICONS: Record<Category, typeof Bell> = {
     announcement: Bell, market: TrendingUp, portfolio: Sparkles, academy: Info, system: Info, community: MessageCircle,
 };
+function displayNotificationMessage(notification: Notification) {
+    if (!['Hesap itirazı kabul edildi', 'Hesap itirazı sonuçlandı'].includes(notification.title)) return notification.message;
+
+    const statusMessages = [
+        'Hesap erişiminiz yeniden açıldı.',
+        'Hesap itirazınız yeniden değerlendirildi ve reddedildi; hesap kısıtlaması devam ediyor.',
+        'Hesap itirazınız reddedildi.',
+    ];
+    const statusMessage = statusMessages.find((candidate) => notification.message.startsWith(candidate));
+    if (!statusMessage) return notification.message;
+
+    const adminMessage = notification.message.slice(statusMessage.length).trim();
+    if (!adminMessage || adminMessage.startsWith('Yönetici mesajı:')) return notification.message;
+    return `${statusMessage}\n\nYönetici mesajı: ${adminMessage}`;
+}
 
 export default function NotificationCenter() {
     const { confirmDialog } = useAppPreferences();
@@ -271,7 +286,7 @@ export default function NotificationCenter() {
                             <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${selected.severity === 'critical' ? 'border-rose-500/20 bg-rose-500/10 text-rose-300' : selected.severity === 'warning' ? 'border-amber-500/20 bg-amber-500/10 text-amber-300' : selected.severity === 'success' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-sky-500/20 bg-sky-500/10 text-sky-300'}`}>{selected.severity === 'critical' ? 'Kritik' : selected.severity === 'warning' ? 'Uyarı' : selected.severity === 'success' ? 'Başarılı' : 'Bilgi'}</span>
                         </div>
                         <h3 className="mt-4 break-words text-lg font-bold leading-snug text-white">{selected.title}</h3>
-                        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{selected.message}</p>
+                        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{displayNotificationMessage(selected)}</p>
                         {selected.action_url && <a href={selected.action_url} onClick={() => setOpen(false)} className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-500">İlgili içeriği aç</a>}
                         <time className="mt-5 block border-t border-slate-800 pt-3 text-xs text-slate-500">{new Date(selected.created_at).toLocaleString('tr-TR')}</time>
                     </article>
@@ -313,7 +328,7 @@ export default function NotificationCenter() {
                                 {selectionMode && <button type="button" onClick={() => toggleSelectedNotification(item.id)} aria-label={isSelected ? 'Seçimi kaldır' : 'Bildirimi seç'} aria-pressed={isSelected} className="grid w-8 shrink-0 place-items-center self-center rounded-lg text-slate-400 hover:text-emerald-300">{isSelected ? <CheckSquare className="h-4 w-4 text-emerald-300" /> : <Square className="h-4 w-4" />}</button>}
                                 <button type="button" onClick={() => void openNotification(item)} className={`flex min-h-[72px] min-w-0 flex-1 items-start gap-3 rounded-lg p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${isSelected ? 'bg-emerald-500/5' : ''}`}>
                                     <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon className="h-4 w-4" /></span>
-                                    <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><strong className={`line-clamp-2 text-sm leading-snug ${item.read_at ? 'font-medium text-slate-300' : 'font-bold text-white'}`}>{item.title}</strong>{!item.read_at && <Circle className="h-2 w-2 shrink-0 fill-emerald-400 text-emerald-400" />}</span><span className="mt-1.5 line-clamp-2 block break-words text-xs leading-5 text-slate-400">{item.message}</span><span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500"><span className="rounded-full bg-slate-800 px-2 py-0.5">{CATEGORY_LABELS[item.category]}</span><time>{new Date(item.created_at).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })}</time></span></span>
+                                    <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><strong className={`line-clamp-2 text-sm leading-snug ${item.read_at ? 'font-medium text-slate-300' : 'font-bold text-white'}`}>{item.title}</strong>{!item.read_at && <Circle className="h-2 w-2 shrink-0 fill-emerald-400 text-emerald-400" />}</span><span className="mt-1.5 line-clamp-2 block whitespace-pre-line break-words text-xs leading-5 text-slate-400">{displayNotificationMessage(item)}</span><span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500"><span className="rounded-full bg-slate-800 px-2 py-0.5">{CATEGORY_LABELS[item.category]}</span><time>{new Date(item.created_at).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })}</time></span></span>
                                 </button>
                                 <button type="button" onClick={() => void setRead(item, !item.read_at)} title={item.read_at ? 'Okunmadı olarak işaretle' : 'Okundu olarak işaretle'} aria-label={item.read_at ? 'Okunmadı olarak işaretle' : 'Okundu olarak işaretle'} className="my-2 grid min-h-10 w-10 shrink-0 place-items-center self-center rounded-lg text-slate-500 hover:bg-slate-700 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50">{item.read_at ? <Circle className="h-4 w-4" /> : <Check className="h-4 w-4" />}</button>
                                 <button type="button" onClick={() => void deleteNotifications(false, item)} title="Bildirimi sil" aria-label={`${item.title} bildirimini sil`} className="my-2 grid min-h-10 w-10 shrink-0 place-items-center self-center rounded-lg text-slate-500 hover:bg-rose-500/10 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"><Trash2 className="h-4 w-4" /></button>
