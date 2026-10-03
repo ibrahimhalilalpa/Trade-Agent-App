@@ -9,7 +9,7 @@ async function getInitialProgress() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { initialProgress: empty, initialSignedIn: false };
     const [{ data }, lessons] = await Promise.all([
-        supabase.from('user_education_progress').select('lesson_id').eq('completed', true),
+        supabase.from('user_education_progress').select('lesson_id').eq('user_id', user.id).eq('completed', true),
         supabase.rpc('get_public_academy_lessons'),
     ]);
     const rows = (lessons.data ?? []) as Array<{ id: string; published: boolean }>;
@@ -21,7 +21,8 @@ async function getInitialProgress() {
     return { initialProgress: { completedLessonIds, completedCount: completedLessonIds.length, totalCount, percentage: totalCount ? Math.round((completedLessonIds.length / totalCount) * 100) : 0 }, initialSignedIn: true };
 }
 
-export default async function EducationPage() {
+export default async function EducationPage({ searchParams }: { searchParams: Promise<{ chapter?: string }> }) {
     const initial = await getInitialProgress();
-    return <main className="app-shell ds-shell"><div className="app-container ds-container"><EducationCenter {...initial} /></div></main>;
+    const { chapter } = await searchParams;
+    return <main className="app-shell ds-shell"><div className="app-container ds-container"><EducationCenter {...initial} initialChapterId={chapter} /></div></main>;
 }

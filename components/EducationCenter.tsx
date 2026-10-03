@@ -8,10 +8,10 @@ import { getSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 type Progress = { completedLessonIds: string[]; completedCount: number; totalCount: number; percentage: number };
 const EMPTY_PROGRESS: Progress = { completedLessonIds: [], completedCount: 0, totalCount: ACADEMY_LESSONS.length, percentage: 0 };
-interface EducationCenterProps { initialProgress?: Progress; initialSignedIn?: boolean; }
+interface EducationCenterProps { initialProgress?: Progress; initialSignedIn?: boolean; initialChapterId?: string; }
 
-export default function EducationCenter({ initialProgress = EMPTY_PROGRESS, initialSignedIn = false }: EducationCenterProps) {
-    const [activeChapterId, setActiveChapterId] = useState(ACADEMY_CHAPTERS[0].id);
+export default function EducationCenter({ initialProgress = EMPTY_PROGRESS, initialSignedIn = false, initialChapterId = ACADEMY_CHAPTERS[0].id }: EducationCenterProps) {
+    const [activeChapterId, setActiveChapterId] = useState(initialChapterId);
     const [progress, setProgress] = useState<Progress>(initialProgress);
     const [signedIn, setSignedIn] = useState(initialSignedIn);
     const [authLoading, setAuthLoading] = useState(false);

@@ -39,7 +39,8 @@ export async function GET() {
     const { supabase, user } = await getContext();
     if (!supabase) return NextResponse.json({ error: 'Supabase bağlantısı yapılandırılmamış.' }, { status: 503 });
     if (!user) return NextResponse.json({ error: 'İlerlemeyi görmek için giriş yapmalısınız.' }, { status: 401 });
-    const { data, error } = await supabase.from('user_education_progress').select('lesson_id').eq('completed', true);
+    const { data, error } = await supabase.from('user_education_progress').select('lesson_id')
+        .eq('user_id', user.id).eq('completed', true);
     if (error) return NextResponse.json({ error: isSchemaError(error) ? SCHEMA_ERROR : 'İlerleme yüklenemedi.' }, { status: 500 });
     return NextResponse.json({ success: true, data: response((data ?? []).map((item) => item.lesson_id), await getLessonIds(supabase)) });
 }
@@ -58,6 +59,11 @@ export async function PUT(request: Request) {
         : supabase.from('user_education_progress').delete().eq('user_id', user.id).eq('lesson_id', lessonId);
     const { error } = await query;
     if (error) return NextResponse.json({ error: isSchemaError(error) ? SCHEMA_ERROR : 'İlerleme kaydedilemedi.' }, { status: 500 });
-    const { data } = await supabase.from('user_education_progress').select('lesson_id').eq('completed', true);
+    const { data, error: progressError } = await supabase.from('user_education_progress').select('lesson_id')
+        .eq('user_id', user.id).eq('completed', true);
+    if (progressError) {
+        console.error('Updated academy progress could not be reloaded.', progressError);
+        return NextResponse.json({ error: 'İlerleme kaydedildi ancak güncel durum yüklenemedi.' }, { status: 500 });
+    }
     return NextResponse.json({ success: true, data: response((data ?? []).map((item) => item.lesson_id), lessonIds) });
 }

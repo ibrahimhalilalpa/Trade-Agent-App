@@ -125,9 +125,9 @@ export default function SocialProfileSettings({ onSaved }: { onSaved?: () => voi
     return <form onSubmit={(event) => void save(event)} className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
         <div><h3 className="text-sm font-bold text-white">Topluluk profili ve gizlilik</h3><p className="mt-1 text-[10px] text-slate-500">Her bilgi için herkese, takipçilerine veya yalnızca kendine görünürlük belirle.</p></div>
         <Link href={`/profile/${encodeURIComponent(profile.username)}?preview=1`} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-emerald-500/30 hover:text-emerald-300"><Eye size={14} />Dışarıdan nasıl görünüyor?</Link>
-        <div className="flex items-center gap-3">
-            <ForumAvatar avatarUrl={profile.avatar_url} gender={profile.gender} username={profile.username} size={48} className="h-12 w-12 rounded-full border border-slate-700 object-cover" />
-            <label className="flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs text-slate-300 hover:border-emerald-500/30"><ImagePlus size={15} className="shrink-0 text-emerald-400" /><span className="truncate">{avatarFile?.name ?? 'Profil resmi seç (5 MB maks.)'}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={(event) => {
+        <div className="flex min-w-0 items-center gap-3">
+            <ForumAvatar avatarUrl={profile.avatar_url} gender={profile.gender} username={profile.username} size={48} className="h-12 w-12 shrink-0 aspect-square rounded-full border border-slate-700 object-cover object-center" />
+            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs text-slate-300 hover:border-emerald-500/30"><ImagePlus size={15} className="shrink-0 text-emerald-400" /><span className="truncate">{avatarFile?.name ?? 'Profil resmi seç (5 MB maks.)'}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 if (file && (file.size > 5 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type))) {
                     setError('JPG, PNG, WebP veya GIF biçiminde, en fazla 5 MB görsel seçin.');

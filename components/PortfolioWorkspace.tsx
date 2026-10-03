@@ -305,12 +305,12 @@ export default function PortfolioWorkspace() {
             <span className="ds-eyebrow">TRADE ENGINE / SANAL PORTFÖY</span>
             <div className="portfolio-page-heading">
                 <div><h1><BriefcaseBusiness aria-hidden="true" /> Sanal portföyüm</h1><p>Alım-satım simülasyonlarını, kullanılabilir bakiyeyi ve portföy performansını takip et.</p></div>
-                <button className="portfolio-reset-button" onClick={() => void resetPortfolio()} disabled={resetting || loading || !portfolio}>
+                {portfolio && <button className="portfolio-reset-button" onClick={() => void resetPortfolio()} disabled={resetting || loading}>
                     <RotateCcw size={15} /> {resetting ? 'Sıfırlanıyor…' : 'Portföyü sıfırla'}
-                </button>
+                </button>}
             </div>
         </header>
-        {error && <div className="portfolio-alert" role="alert"><span>{error}</span><div>{error.includes('giriş yapın') && <Link href="/auth?next=%2Fportfolio">Giriş yap</Link>}<button onClick={() => void load()}>Tekrar dene</button></div></div>}
+        {error && <div className="portfolio-alert" role="alert"><span>{error}</span><div>{error.includes('giriş yapın') ? <Link href="/auth?next=%2Fportfolio">Giriş yap</Link> : <button onClick={() => void load()}>Tekrar dene</button>}</div></div>}
         {loading && !portfolio ? <div className="ds-panel portfolio-loading">Portföy yükleniyor…</div> : portfolio && <>
             {staleSymbols.length > 0 && <p className="portfolio-alert" role="status">Anlık fiyat alınamayan semboller eski kapanış fiyatıyla gösteriliyor: {staleSymbols.join(', ')}.</p>}
             <section className="portfolio-summary-grid">

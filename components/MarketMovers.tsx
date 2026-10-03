@@ -136,13 +136,13 @@ export default function MarketMovers({ onSelect }: MarketMoversProps) {
             {moverCard('İşlem hacmi en yüksek · TL', Volume2, lists.volume, (quote) => formatTurnover(quote.tradedValue ?? 0), 'slate')}
         </div>
         {!authenticated && <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-center text-xs text-slate-300">
-            <span>İlk 5 sıra açık. Giriş yaparak tüm 10 sırayı görüntüleyin.</span>
+            <span>İlk 5 sıra açık. Giriş yaparak ilk 10 sıraya kadar görüntüleyin.</span>
             <Link href="/auth?next=%2Fmarket" className="font-bold text-emerald-400 underline-offset-2 hover:underline">Giriş yap</Link>
         </div>}
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/15 bg-amber-500/5 px-3 py-2.5 text-[11px] text-amber-200/80">
             <span>Hacim, gün içinde gerçekleşen toplam işlem tutarıdır; seans kapalıyken değişmemesi normaldir. Veriler sağlayıcı gecikmesine tabi olabilir.</span>
             <span className="inline-flex items-center gap-1.5 text-slate-500"><Clock3 className="h-3 w-3" />{updatedAt ? `Güncellendi ${new Date(updatedAt).toLocaleTimeString('tr-TR')}` : loading ? 'Veri bekleniyor' : provider === 'fallback' ? 'Yedek veri' : 'Güncelleme bekleniyor'}</span>
         </div>
-        <p className="text-[11px] text-slate-600">3 ve 6 saatlik değişimler sağlayıcı tarafından sunulmadığı için 4 saatlik görünüm kullanılır. Devre kesici bilgisi de mevcut piyasa veri kaynağında bulunmuyor.</p>
+        <p className="text-[11px] text-slate-500">Piyasa verileri bilgilendirme amaçlıdır ve yatırım tavsiyesi niteliği taşımaz. Veriler yayıncı sağlayıcılara bağlı olarak gecikmeli yansıyabilir.</p>
     </section>;
 }

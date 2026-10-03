@@ -6,7 +6,6 @@ import type { MarketQuote } from '@/lib/types';
 
 interface MarketOverviewProps { symbols?: string[]; selectedSymbol: string; onSelect: (symbol: string) => void; onSymbolCountChange?: (count: number) => void; }
 type SortMode = 'ALL' | 'UP' | 'DOWN' | 'FLAT';
-type PageSize = '20' | '50' | '100' | 'all';
 type Period = '1D' | '1W' | '1M' | '6M' | '1Y' | '5Y';
 type SortKey = 'symbol' | 'change' | 'price' | 'volume' | 'marketCap';
 const FALLBACK_SYMBOLS = ['THYAO', 'GARAN', 'EREGL', 'ASELS', 'KCHOL', 'SASA', 'SISE', 'TUPRS', 'AKBNK', 'BIMAS', 'YKBNK', 'MANAS'];
@@ -32,13 +31,32 @@ export default function MarketOverview({ symbols = FALLBACK_SYMBOLS, selectedSym
     const [sortKey, setSortKey] = useState<SortKey>('symbol');
     const [direction, setDirection] = useState<'asc' | 'desc'>('asc');
     const [query, setQuery] = useState('');
-    const [pageSize, setPageSize] = useState<PageSize>('20');
+    const [pageSize, setPageSize] = useState(20);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [lastUpdated, setLastUpdated] = useState('');
     const [provider, setProvider] = useState<'tradingview' | 'fallback' | ''>('');
     const previousPrices = useRef<Record<string, number>>({});
     const [priceMoves, setPriceMoves] = useState<Record<string, 'up' | 'down' | 'flat'>>({});
+
+    useEffect(() => {
+        const applySearch = (symbol: string) => {
+            setQuery(symbol);
+        };
+        const onSearch = (event: Event) => {
+            const symbol = (event as CustomEvent<{ symbol?: string }>).detail?.symbol;
+            if (symbol) applySearch(symbol);
+        };
+        const timer = window.setTimeout(() => {
+            const requestedSymbol = new URLSearchParams(window.location.search).get('search');
+            if (requestedSymbol) applySearch(requestedSymbol);
+        }, 0);
+        window.addEventListener('trade-agent:market-search', onSearch);
+        return () => {
+            window.clearTimeout(timer);
+            window.removeEventListener('trade-agent:market-search', onSearch);
+        };
+    }, []);
 
     useEffect(() => {
         let active = true;
@@ -87,16 +105,11 @@ export default function MarketOverview({ symbols = FALLBACK_SYMBOLS, selectedSym
                 - (sortKey === 'change' ? second.changePercent : second[sortKey]);
         return comparison * (direction === 'asc' ? 1 : -1);
     }), [direction, query, rows, sortKey, sortMode]);
-    const pageCount = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleRows.length / Number(pageSize)));
+    const pageCount = Math.max(1, Math.ceil(visibleRows.length / pageSize));
     const currentPage = Math.min(page, pageCount);
-    const startIndex = pageSize === 'all' ? 0 : (currentPage - 1) * Number(pageSize);
-    const pageRows = pageSize === 'all' ? visibleRows : visibleRows.slice(startIndex, startIndex + Number(pageSize));
-    const rangeStart = visibleRows.length ? startIndex + 1 : 0;
-    const rangeEnd = Math.min(startIndex + pageRows.length, visibleRows.length);
-
+    const pageRows = visibleRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
     const toggleSort = (key: SortKey) => {
         if (sortMode !== 'ALL') return;
-        setPage(1);
         if (sortKey === key) setDirection((value) => value === 'asc' ? 'desc' : 'asc');
         else { setSortKey(key); setDirection('desc'); }
     };
@@ -114,27 +127,25 @@ export default function MarketOverview({ symbols = FALLBACK_SYMBOLS, selectedSym
         <div className="period-tabs">{PERIODS.map(([value, label]) => <button key={value} className={period === value ? 'active' : ''} onClick={() => { setPeriod(value); setPage(1); }}>{label}</button>)}</div>
         <div className="market-controls flex-wrap">
             <div className="market-tabs">{([['ALL', 'Tümü'], ['UP', 'En çok artan'], ['DOWN', 'En çok azalan'], ['FLAT', 'Yatay']] as Array<[SortMode, string]>).map(([mode, label]) => <button key={mode} className={sortMode === mode ? 'active' : ''} onClick={() => { setSortMode(mode); setPage(1); }}>{label}</button>)}</div>
-            <div className="flex flex-wrap items-center gap-2">
-                <label className="limit-select">Sayfa başı
-                    <select aria-label="Sayfa başına hisse sayısı" value={pageSize} onChange={(event) => { setPageSize(event.target.value as PageSize); setPage(1); }}>
-                        <option value="20">20</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                        <option value="all">Tümü</option>
-                    </select>
-                </label>
-                <span className="limit-select">{rangeStart}–{rangeEnd} / {visibleRows.length} hisse</span>
-                {pageSize !== 'all' && <nav aria-label="Hisse tablosu sayfaları" className="flex items-center gap-1">
-                    <button type="button" aria-label="Önceki sayfa" disabled={currentPage <= 1} onClick={() => setPage(Math.max(1, currentPage - 1))} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-2 text-xs font-semibold text-slate-300 transition hover:border-emerald-500/40 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={14} />Önceki</button>
-                    <span className="min-w-14 text-center text-[10px] font-semibold text-slate-400">{currentPage} / {pageCount}</span>
-                    <button type="button" aria-label="Sonraki sayfa" disabled={currentPage >= pageCount} onClick={() => setPage(Math.min(pageCount, currentPage + 1))} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-2 text-xs font-semibold text-slate-300 transition hover:border-emerald-500/40 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40">Sonraki<ChevronRight size={14} /></button>
-                </nav>}
-            </div>
+            <span className="market-row-count">{visibleRows.length} hisse</span>
         </div>
         <div className="market-table-wrap"><table className="market-table"><thead><tr>{header('HİSSE', 'symbol')}{header('FİYAT', 'price')}{header('DEĞİŞİM', 'change')}{header('HACİM', 'volume')}{header('PİYASA DEĞERİ', 'marketCap')}<th>YÖN</th><th>GÜNCELLEME</th></tr></thead><tbody>{pageRows.map((row) => {
             return <tr key={row.symbol} className={row.symbol === selectedSymbol ? 'active-row' : ''} onClick={() => onSelect(row.symbol)}>
                 <td><strong>{row.symbol}</strong><span>{row.name}</span></td><td><span className="market-price">{row.price ? `${row.price.toFixed(2)} TL` : '--'}{priceMoves[row.symbol] !== 'flat' && priceMoves[row.symbol] && <i aria-label={priceMoves[row.symbol] === 'up' ? 'Önceki güncellemeye göre yükseldi' : 'Önceki güncellemeye göre düştü'} className={`market-price-move ${priceMoves[row.symbol]}`} />}</span></td><td className={row.changePercent > 0 ? 'positive' : row.changePercent < 0 ? 'negative' : 'neutral'}>{row.changePercent > 0 ? '+' : ''}{row.changePercent.toFixed(2)}%</td><td>{formatLarge(row.volume)}</td><td>{formatLarge(row.marketCap)}</td><td><span className={`trend-pill ${row.changePercent > 0 ? 'yukari' : row.changePercent < 0 ? 'asagi' : 'yatay'}`}>{row.changePercent > 0 ? <ArrowUpRight size={12} /> : row.changePercent < 0 ? <ArrowDownRight size={12} /> : <Minus size={12} />}{row.changePercent > 0 ? 'Yukarı' : row.changePercent < 0 ? 'Aşağı' : 'Yatay'}</span></td><td>{formatQuoteTime(row.updatedAt)}</td>
             </tr>;
         })}</tbody></table>{!visibleRows.length && <div className="empty-cell">Eşleşen hisse bulunamadı.</div>}</div>
+        <div className="market-pagination">
+            <span>{visibleRows.length ? `${((currentPage - 1) * pageSize + 1).toLocaleString('tr-TR')}–${Math.min(currentPage * pageSize, visibleRows.length).toLocaleString('tr-TR')} / ${visibleRows.length.toLocaleString('tr-TR')}` : '0 hisse'}</span>
+            <div className="market-pagination-actions">
+                <label>Sayfa başı
+                    <select aria-label="Sayfa başına hisse sayısı" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>
+                        {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
+                    </select>
+                </label>
+                <button type="button" aria-label="Önceki sayfa" title="Önceki sayfa" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}><ChevronLeft size={16} /></button>
+                <span>{currentPage} / {pageCount}</span>
+                <button type="button" aria-label="Sonraki sayfa" title="Sonraki sayfa" disabled={currentPage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}><ChevronRight size={16} /></button>
+            </div>
+        </div>
     </section>;
 }
