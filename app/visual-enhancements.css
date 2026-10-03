@@ -2704,8 +2704,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan) !important
   .nav-ticker-strip { width: 100%; padding-inline: 4px; }
   .global-nav-frame .app-nav { gap: 8px; }
   .global-nav-frame .app-nav-brand { order: 1; flex: 1 1 auto; }
-  .nav-search-wrap { order: 2; flex: 0 0 38px; width: 38px; min-width: 38px; max-width: 38px; justify-content: center; padding: 0; }
-  .nav-search-wrap > span { display: none; }
+  .nav-search-wrap { order: 4; flex: 1 0 100%; width: 100%; min-width: 0; max-width: none; justify-content: flex-start; padding: 0 12px; }
   .app-nav .mobile-menu-toggle { order: 3; }
   .app-nav-actions { order: 4; }
   .app-nav .nav-menu-trigger { justify-content: space-between; }
@@ -2750,8 +2749,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan) !important
   .app-nav-actions .app-theme-toggle,
   .app-nav-actions .notification-center > button,
   .auth-profile-trigger,
-  .app-nav .mobile-menu-toggle,
-  .nav-search-wrap { width: 36px; min-width: 36px; max-width: 36px; height: 36px; min-height: 36px; }
+  .app-nav .mobile-menu-toggle { width: 36px; min-width: 36px; max-width: 36px; height: 36px; min-height: 36px; }
   .auth-profile-trigger { padding: 2px; }
   .auth-profile-avatar { width: 29px; height: 29px; }
   .app-nav .mobile-nav-heading { margin-top: 8px; }
@@ -2801,8 +2799,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan) !important
   .app-nav .nav-menu-area .auth-profile-trigger { width: auto; min-width: 120px; justify-content: flex-start; padding-inline: 5px 10px; }
 }
 @media (max-width: 760px) {
-  .app-nav .nav-search-wrap { order: 2; flex: 0 0 38px; width: 38px; min-width: 38px; max-width: 38px; justify-content: center; padding: 0; }
-  .app-nav .nav-search-wrap > span { display: none; }
   .app-nav .mobile-menu-toggle { order: 3; }
   .app-nav .nav-menu-area { flex-direction: column; align-items: stretch; }
   .app-nav .nav-menu-area .app-nav-actions { min-height: 52px; }
@@ -2892,6 +2888,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan) !important
     border-radius: 24px !important;
     animation: notification-drawer-in .24s cubic-bezier(.2, .8, .2, 1) both;
   }
+  .notification-panel > header { gap: 8px; padding-inline: 10px; }
+  .notification-header-actions { gap: 2px; }
+  .notification-header-actions > button { width: 32px; min-width: 32px; padding-inline: 0; justify-content: center; }
+  .notification-header-actions > .notification-close-button { width: 36px; min-width: 36px; }
+  .notification-header-text-action > span { display: none; }
+  .nav-ticker-track { animation-duration: 30s; }
 }
 
 @keyframes nav-drawer-in {
