@@ -5,7 +5,7 @@ Borsa İstanbul (BİST) araştırması, sanal portföy takibi ve yatırım eğit
 ## Özellikler
 
 - BİST hisseleri için piyasa takibi, grafikler ve şirket bilgileri
-- Kişisel izleme listeleri, fiyat alarmları ve sanal portföy
+- Kişisel izleme listeleri, araştırma günlüğü, fiyat alarmları ve sanal portföy
 - Limit, kâr-al, zarar-durdur ve zincir sanal emirleri
 - Yapay zekâ destekli araştırma akışı
 - Akademi, trader sıralaması, kullanıcı profilleri ve bildirimler

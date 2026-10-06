@@ -3003,3 +3003,170 @@ html { overflow-x: clip; }
 @media (max-width: 520px) {
   .global-nav-frame .app-nav-brand { width: clamp(100px, 30vw, 124px); }
 }
+
+.journal-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 26px;
+  margin: 18px 0 22px;
+  padding: clamp(22px, 4vw, 36px);
+  overflow: hidden;
+  border: 1px solid rgba(52, 211, 153, .2);
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at 2% 0%, rgba(16, 185, 129, .15), transparent 48%),
+    linear-gradient(125deg, rgba(15, 23, 42, .98), rgba(8, 25, 28, .94));
+  box-shadow: 0 22px 55px rgba(0, 0, 0, .18), inset 0 1px rgba(255, 255, 255, .035);
+}
+.journal-hero-copy { min-width: 0; }
+.journal-hero-copy .ds-eyebrow { display: inline-flex; align-items: center; gap: 7px; color: #6ee7b7; }
+.journal-hero-copy h1 { margin: 12px 0 8px; color: #f8fafc; font-size: clamp(28px, 4vw, 42px); font-weight: 800; letter-spacing: -.045em; line-height: 1.08; }
+.journal-hero-copy p { max-width: 590px; margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.7; }
+.journal-hero-stats { display: grid; grid-template-columns: repeat(3, minmax(100px, 1fr)); gap: 9px; }
+.journal-hero-stats > div { display: grid; min-width: 0; gap: 10px; padding: 13px; border: 1px solid rgba(71, 85, 105, .52); border-radius: 14px; background: rgba(2, 6, 23, .36); }
+.journal-hero-stats > div > span { display: inline-flex; align-items: center; gap: 6px; color: #94a3b8; font-size: 9px; white-space: nowrap; }
+.journal-hero-stats > div > span svg { color: #6ee7b7; }
+.journal-hero-stats strong { color: #f8fafc; font-size: 23px; font-weight: 800; line-height: 1; }
+.journal-compose-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(250px, .75fr); align-items: stretch; gap: 14px; }
+.journal-form { display: grid; align-content: start; gap: 16px; padding: clamp(17px, 2.5vw, 24px); border-color: rgba(71, 85, 105, .68); background: linear-gradient(145deg, rgba(20, 33, 38, .96), rgba(15, 23, 42, .92)); }
+.journal-form-heading { display: flex; align-items: center; gap: 12px; min-width: 0; margin-bottom: 2px; }
+.journal-form-icon, .journal-guide-icon { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(52, 211, 153, .24); border-radius: 14px; background: rgba(16, 185, 129, .11); color: #6ee7b7; }
+.journal-form-heading > div { min-width: 0; flex: 1; }
+.journal-form-heading h2 { margin: 4px 0 0; color: #f8fafc; font-size: 17px; font-weight: 750; letter-spacing: -.02em; }
+.journal-auto-date { display: inline-flex; align-items: center; gap: 6px; color: #64748b; font-size: 9px; white-space: nowrap; }
+.journal-auto-date svg { color: #6ee7b7; }
+.journal-field { display: grid; gap: 7px; color: #cbd5e1; font-size: 11px; font-weight: 700; }
+.journal-field input, .journal-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #334155;
+  border-radius: 11px;
+  outline: none;
+  background: rgba(2, 6, 23, .56);
+  color: #f1f5f9;
+  font: 500 12px/1.6 var(--font-geist-sans), sans-serif;
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.journal-field input { min-height: 42px; max-width: 200px; padding: 0 12px; font-weight: 750; letter-spacing: .045em; }
+.journal-field textarea { min-height: 86px; padding: 10px 12px; resize: vertical; }
+.journal-field input::placeholder, .journal-field textarea::placeholder { color: #64748b; font-weight: 450; letter-spacing: 0; }
+.journal-field input:focus, .journal-field textarea:focus { border-color: rgba(52, 211, 153, .68); background: rgba(2, 6, 23, .78); box-shadow: 0 0 0 3px rgba(16, 185, 129, .1); }
+.journal-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 2px; }
+.journal-form-footer > span { max-width: 280px; color: #64748b; font-size: 10px; line-height: 1.5; }
+.journal-guide { position: relative; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: 22px; overflow: hidden; border: 1px solid rgba(71, 85, 105, .58); border-radius: 18px; background: radial-gradient(ellipse at 100% 0%, rgba(16, 185, 129, .12), transparent 55%), rgba(15, 23, 42, .66); }
+.journal-guide .ds-eyebrow { margin-top: 19px; color: #6ee7b7; font-size: 8px; }
+.journal-guide h2 { margin: 8px 0 7px; color: #f8fafc; font-size: 20px; font-weight: 780; letter-spacing: -.035em; line-height: 1.25; }
+.journal-guide > p { margin: 0 0 15px; color: #94a3b8; font-size: 11px; line-height: 1.65; }
+.journal-guide-step { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 0; border-top: 1px solid rgba(51, 65, 85, .62); }
+.journal-guide-step > span { display: grid; flex: 0 0 26px; width: 26px; height: 26px; place-items: center; border: 1px solid rgba(52, 211, 153, .2); border-radius: 8px; background: rgba(16, 185, 129, .08); color: #6ee7b7; font: 700 9px var(--font-geist-mono), monospace; }
+.journal-guide-step > div { display: grid; gap: 2px; }
+.journal-guide-step strong { color: #cbd5e1; font-size: 10px; }
+.journal-guide-step small { color: #64748b; font-size: 9px; }
+.journal-search { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; border: 1px solid #334155; border-radius: 10px; background: rgba(2, 6, 23, .55); color: #64748b; }
+.journal-search:focus-within { border-color: rgba(52, 211, 153, .55); box-shadow: 0 0 0 3px rgba(16, 185, 129, .08); }
+.journal-search > svg { flex: 0 0 auto; color: #6ee7b7; }
+.journal-search input { width: min(220px, 48vw); min-width: 0; border: 0; outline: none; background: transparent; color: #e2e8f0; font: 500 11px var(--font-geist-sans), sans-serif; }
+.journal-search input::placeholder { color: #64748b; }
+.journal-search > span { min-width: 22px; padding: 3px 5px; border-radius: 6px; background: rgba(51, 65, 85, .55); color: #94a3b8; font: 700 9px var(--font-geist-mono), monospace; text-align: center; }
+.journal-filter-tabs { display: flex; gap: 5px; width: fit-content; max-width: 100%; margin: -3px 0 13px; padding: 4px; border: 1px solid rgba(51, 65, 85, .65); border-radius: 11px; background: rgba(2, 6, 23, .44); }
+.journal-filter-tabs button { display: inline-flex; align-items: center; gap: 7px; min-height: 31px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #94a3b8; font: 600 10px var(--font-geist-sans), sans-serif; cursor: pointer; transition: color .15s ease, border-color .15s ease, background .15s ease; }
+.journal-filter-tabs button[aria-pressed="true"] { border-color: rgba(52, 211, 153, .2); background: rgba(16, 185, 129, .1); color: #6ee7b7; }
+.journal-filter-tabs button > span { min-width: 18px; padding: 2px 4px; border-radius: 5px; background: rgba(51, 65, 85, .55); color: #cbd5e1; font: 700 8px var(--font-geist-mono), monospace; text-align: center; }
+.journal-entry-list { display: grid; gap: 12px; }
+.journal-entry-card { position: relative; padding: 18px; overflow: hidden; border-color: rgba(51, 65, 85, .78); background: linear-gradient(135deg, rgba(20, 33, 38, .9), rgba(15, 23, 42, .82)); transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+.journal-entry-card:hover { transform: translateY(-1px); border-color: rgba(100, 116, 139, .72); box-shadow: 0 12px 30px rgba(0, 0, 0, .16); }
+.journal-entry-card::before { position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: #fbbf24; content: ''; }
+.journal-entry-card.is-reviewed::before { background: #34d399; }
+.journal-entry-symbol { display: inline-flex; align-items: center; gap: 4px; color: #6ee7b7; font-size: 17px; font-weight: 850; letter-spacing: .025em; text-decoration: none; }
+.journal-entry-symbol:hover { color: #a7f3d0; }
+.journal-entry-symbol svg { opacity: .65; }
+.journal-status-badge { display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 0 8px; border: 1px solid rgba(245, 158, 11, .2); border-radius: 999px; background: rgba(245, 158, 11, .08); color: #fbbf24; font-size: 9px; font-weight: 700; }
+.journal-status-badge.matched { border-color: rgba(52, 211, 153, .2); background: rgba(16, 185, 129, .08); color: #6ee7b7; }
+.journal-status-badge.partially_matched { border-color: rgba(56, 189, 248, .2); background: rgba(14, 165, 233, .08); color: #7dd3fc; }
+.journal-status-badge.not_matched { border-color: rgba(251, 113, 133, .2); background: rgba(244, 63, 94, .08); color: #fda4af; }
+.journal-entry-dates { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 7px; color: #64748b; font-size: 9px; }
+.journal-entry-dates > span { display: inline-flex; align-items: center; gap: 4px; }
+.journal-entry-dates svg { color: #64748b; }
+.journal-entry-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.journal-entry-copy { min-width: 0; padding: 12px 13px; border: 1px solid rgba(51, 65, 85, .58); border-radius: 12px; background: rgba(2, 6, 23, .32); }
+.journal-entry-copy h3, .journal-review-result h3 { display: flex; align-items: center; gap: 7px; margin: 0; color: #94a3b8; font-size: 9px; font-weight: 750; letter-spacing: .055em; text-transform: uppercase; }
+.journal-entry-copy h3 > span { color: #6ee7b7; font: 700 9px var(--font-geist-mono), monospace; }
+.journal-entry-copy.scenario h3 > span { color: #7dd3fc; }
+.journal-entry-copy p, .journal-review-result p { margin: 7px 0 0; color: #dbe4e2; font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.journal-review-result { margin-top: 10px; padding: 12px 13px; border: 1px solid rgba(52, 211, 153, .16); border-radius: 12px; background: rgba(16, 185, 129, .045); }
+.journal-review-result h3 { color: #6ee7b7; }
+.journal-disclaimer { display: flex; align-items: flex-start; gap: 8px; margin: 18px 0 0; color: #64748b; font-size: 10px; line-height: 1.6; }
+.journal-disclaimer svg { flex: 0 0 auto; margin-top: 1px; color: #6ee7b7; }
+:root[data-theme="light"] .journal-hero { border-color: #ccefe1; background: radial-gradient(ellipse at 2% 0%, rgba(16, 185, 129, .12), transparent 48%), linear-gradient(125deg, #fff, #f0fdf8); box-shadow: 0 18px 45px rgba(15, 23, 42, .07); }
+:root[data-theme="light"] .journal-hero-copy h1,
+:root[data-theme="light"] .journal-hero-stats strong,
+:root[data-theme="light"] .journal-form-heading h2,
+:root[data-theme="light"] .journal-guide h2,
+:root[data-theme="light"] .journal-entry-copy p,
+:root[data-theme="light"] .journal-review-result p { color: #0f172a; }
+:root[data-theme="light"] .journal-hero-copy p,
+:root[data-theme="light"] .journal-hero-stats > div > span,
+:root[data-theme="light"] .journal-auto-date,
+:root[data-theme="light"] .journal-guide > p { color: #64748b; }
+:root[data-theme="light"] .journal-hero-stats > div { border-color: #dbe4ec; background: rgba(255, 255, 255, .75); }
+:root[data-theme="light"] .journal-form { border-color: #dbe4ec; background: linear-gradient(145deg, #fff, #f8fafc); }
+:root[data-theme="light"] .journal-guide { border-color: #dbe4ec; background: radial-gradient(ellipse at 100% 0%, rgba(16, 185, 129, .09), transparent 55%), #f8fafc; }
+:root[data-theme="light"] .journal-field { color: #334155; }
+:root[data-theme="light"] .journal-field input,
+:root[data-theme="light"] .journal-field textarea,
+:root[data-theme="light"] .journal-search { border-color: #cbd5e1; background: #fff; color: #0f172a; }
+:root[data-theme="light"] .journal-field input:focus,
+:root[data-theme="light"] .journal-field textarea:focus { background: #fff; }
+:root[data-theme="light"] .journal-field input::placeholder,
+:root[data-theme="light"] .journal-field textarea::placeholder,
+:root[data-theme="light"] .journal-search input::placeholder { color: #94a3b8; }
+:root[data-theme="light"] .journal-search input { color: #0f172a; }
+:root[data-theme="light"] .journal-filter-tabs { border-color: #dbe4ec; background: #f1f5f9; }
+:root[data-theme="light"] .journal-filter-tabs button { color: #64748b; }
+:root[data-theme="light"] .journal-filter-tabs button[aria-pressed="true"] { color: #047857; }
+:root[data-theme="light"] .journal-filter-tabs button > span { background: #e2e8f0; color: #475569; }
+:root[data-theme="light"] .journal-entry-card { border-color: #dbe4ec; background: linear-gradient(135deg, #fff, #f8fafc); }
+:root[data-theme="light"] .journal-entry-copy { border-color: #e2e8f0; background: rgba(241, 245, 249, .7); }
+:root[data-theme="light"] .journal-entry-copy h3 { color: #64748b; }
+:root[data-theme="light"] .journal-review-result { border-color: #bbf7d0; background: #f0fdf4; }
+@media (max-width: 900px) {
+  .journal-hero { grid-template-columns: 1fr; gap: 20px; }
+  .journal-hero-stats { max-width: 520px; }
+  .journal-compose-layout { grid-template-columns: minmax(0, 1fr); }
+  .journal-guide { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; padding: 16px; }
+  .journal-guide-icon { grid-row: span 2; }
+  .journal-guide .ds-eyebrow { margin: 0; }
+  .journal-guide h2 { grid-column: 2; margin: 2px 0 0; font-size: 16px; }
+  .journal-guide > p { grid-column: 1 / -1; margin-top: 12px; }
+  .journal-guide-step { grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  .journal-hero { gap: 17px; margin-top: 12px; padding: 20px 16px; border-radius: 19px; }
+  .journal-hero-copy h1 { margin-top: 10px; font-size: 29px; }
+  .journal-hero-copy p { font-size: 11px; }
+  .journal-hero-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .journal-hero-stats > div { gap: 7px; padding: 9px 7px; border-radius: 11px; }
+  .journal-hero-stats > div > span { gap: 4px; font-size: 8px; }
+  .journal-hero-stats > div > span svg { width: 12px; height: 12px; }
+  .journal-hero-stats strong { font-size: 19px; }
+  .journal-form { gap: 13px; padding: 15px; border-radius: 16px; }
+  .journal-form-heading { flex-wrap: wrap; }
+  .journal-form-heading h2 { font-size: 15px; }
+  .journal-auto-date { width: 100%; margin-left: 54px; }
+  .journal-form-footer { align-items: flex-start; flex-direction: column; }
+  .journal-form-footer > span { max-width: none; }
+  .journal-form-footer .ds-primary-button { min-height: 40px; }
+  .journal-guide { grid-template-columns: 34px 1fr; padding: 13px; }
+  .journal-guide-icon { width: 34px; height: 34px; border-radius: 11px; }
+  .journal-guide .ds-eyebrow { font-size: 7px; }
+  .journal-guide h2 { font-size: 14px; }
+  .journal-guide > p { font-size: 10px; }
+  .journal-entry-body { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 13px; }
+  .journal-entry-card { padding: 14px 13px 14px 15px; }
+  .journal-entry-dates { display: grid; gap: 5px; }
+  .journal-filter-tabs { width: 100%; }
+  .journal-filter-tabs button { flex: 1; justify-content: center; gap: 5px; padding-inline: 5px; font-size: 9px; }
+  .journal-search { flex: 1 1 100%; }
+  .journal-search input { flex: 1; width: 100%; }
+}

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUpRight, ExternalLink, Heart, RefreshCw, X } from 'lucide-react';
+import { ArrowUpRight, ExternalLink, Heart, NotebookPen, RefreshCw, X } from 'lucide-react';
+import Link from 'next/link';
 import DynamicChart from '@/components/DynamicChart';
 import StockForumPanel from '@/components/StockForumPanel';
 import { describeBistPriceStep, getBistPriceStep, isValidBistPriceTick } from '@/lib/bist-market';
@@ -606,6 +607,9 @@ export default function StockDetailModal({ symbol, onClose, onAnalyze }: StockDe
                     </div>
                 </div>
                 <p className="company-summary">{profile.summary}</p>
+                <Link href={`/journal?symbol=${encodeURIComponent(symbol)}`} className="mb-4 inline-flex min-h-9 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-300 transition hover:border-emerald-400/50 hover:bg-emerald-500/15">
+                    <NotebookPen size={14} /> Araştırma günlüğüne not ekle
+                </Link>
                 <StockForumPanel symbol={symbol} />
 
                 <section className="stock-chart-section">

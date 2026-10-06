@@ -19,6 +19,7 @@ type SearchResult = NavItem & { kind: 'page' | 'stock' };
 const MARKET_LINKS: NavItem[] = [
     { href: '/market', label: 'BİST Hisseleri & Piyasalar', description: 'Piyasa özeti ve hisse performansları', icon: LayoutDashboard, keywords: 'borsa bist hisse fiyat' },
     { href: '/lists', label: 'Çalışma Listelerim', description: 'İzleme listelerin ve araştırma notların', icon: BookOpen, keywords: 'listeler watchlist' },
+    { href: '/journal', label: 'Araştırma Günlüğü', description: 'Hisse takip gerekçelerini ve senaryolarını değerlendir', icon: BookOpen, keywords: 'araştırma günlüğü not senaryo değerlendirme' },
     { href: '/trade-agent', label: 'Trade Agent AI Analizleri', description: 'Yapay zekâ destekli hisse araştırması', icon: Activity, keywords: 'agent yapay zeka analiz' },
 ];
 const COMMUNITY_LINKS: NavItem[] = [
@@ -206,7 +207,7 @@ export default function AppNav() {
         }
     };
 
-    const activeMarket = pathname === '/market' || pathname === '/lists' || pathname === '/trade-agent';
+    const activeMarket = pathname === '/market' || pathname === '/lists' || pathname === '/journal' || pathname === '/trade-agent';
     const activeCommunity = COMMUNITY_LINKS.some(({ href }) => pathname === href || pathname.startsWith(`${href}/`));
     const toggleDropdown = (menu: 'market' | 'community') => {
         setOpenDropdown((current) => current === menu ? null : menu);
