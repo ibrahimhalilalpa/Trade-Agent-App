@@ -11,9 +11,42 @@ export interface ChartPriceAlert {
     direction: 'above' | 'below';
 }
 
+function sessionDate(time: Candle['time']): string {
+    if (typeof time === 'string' && /^\d{4}-\d{2}-\d{2}/.test(time)) return time.slice(0, 10);
+    const date = new Date(typeof time === 'number' ? time * 1000 : time);
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Istanbul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(date);
+}
+
+function formatChartTick(time: Time, timeframe: Timeframe): string {
+    const isTimestamp = typeof time === 'number';
+    const isIntraday = ['1m', '5m', '15m', '30m', '1h', '3h', '6h', '1d'].includes(timeframe);
+    const date = typeof time === 'number'
+        ? new Date(time * 1000)
+        : typeof time === 'string'
+            ? new Date(`${time}T12:00:00Z`)
+            : new Date(Date.UTC(time.year, time.month - 1, time.day, 12));
+    const options: Intl.DateTimeFormatOptions = isIntraday
+        ? isTimestamp ? { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' } : { month: 'short' }
+        : timeframe === '1wk'
+            ? isTimestamp ? { weekday: 'short', day: '2-digit' } : { year: 'numeric' }
+            : timeframe === '1mo'
+                ? isTimestamp ? { day: '2-digit', month: 'short' } : { year: 'numeric' }
+                : timeframe === '1y'
+                    ? { month: 'short' }
+                    : { year: 'numeric' };
+    return new Intl.DateTimeFormat('tr-TR', { ...options, timeZone: 'Europe/Istanbul' }).format(date);
+}
+
 interface DynamicChartProps {
     symbol: string;
     timeframe?: Timeframe;
+    chartType?: 'candles' | 'line';
+    onChartTypeChange?: (chartType: 'candles' | 'line') => void;
     candles: Candle[];
     drawings?: DrawingLine[];
     indicators: Indicators;
@@ -24,7 +57,7 @@ interface DynamicChartProps {
 }
 
 export default function DynamicChart({
-    symbol, timeframe = '1d', candles, drawings = [], indicators, fetchedAt, priceAlerts = [],
+    symbol, timeframe = '1d', chartType = 'candles', onChartTypeChange, candles, drawings = [], indicators, fetchedAt, priceAlerts = [],
     currentPrice, onAlertPriceChange,
 }: DynamicChartProps) {
     const { theme } = useAppPreferences();
@@ -47,16 +80,45 @@ export default function DynamicChart({
             width: container.clientWidth,
             height: container.clientHeight || 420,
             rightPriceScale: { borderColor: chartColors.border },
-            timeScale: { borderColor: chartColors.border, rightOffset: 8 },
+            timeScale: {
+                borderColor: chartColors.border,
+                rightOffset: container.clientWidth <= 600 ? 2 : 8,
+                timeVisible: ['1m', '5m', '15m', '30m', '1h', '3h', '6h', '1d'].includes(timeframe),
+                secondsVisible: false,
+                tickMarkFormatter: (time: Time) => formatChartTick(time, timeframe),
+            },
         });
         chartRef.current = chart;
 
-        const candleSeries = chart.addSeries(CandlestickSeries, {
-            upColor: '#10b981', downColor: '#f43f5e', borderVisible: false,
-            wickUpColor: '#10b981', wickDownColor: '#f43f5e',
-        });
         const chartCandles = candles.map((candle) => ({ ...candle, time: candle.time as Time }));
-        candleSeries.setData(chartCandles);
+        const latestSessionDate = sessionDate(candles[candles.length - 1].time);
+        const sessionOpen = candles.find((candle) => sessionDate(candle.time) === latestSessionDate)?.open;
+        const openPriceLine = sessionOpen === undefined ? null : sessionOpen;
+        const isAtOpen = openPriceLine !== null && Math.abs(referencePrice - openPriceLine) < 0.005;
+        const lineColor = openPriceLine === null || isAtOpen
+            ? '#94a3b8'
+            : referencePrice < openPriceLine ? '#f43f5e' : '#10b981';
+        const priceSeries = chartType === 'line'
+            ? chart.addSeries(LineSeries, { color: lineColor, lineWidth: 2, title: symbol })
+            : chart.addSeries(CandlestickSeries, {
+                upColor: '#10b981', downColor: '#f43f5e', borderVisible: false,
+                wickUpColor: '#10b981', wickDownColor: '#f43f5e',
+            });
+        if (chartType === 'line') {
+            priceSeries.setData(candles.map((candle) => ({ time: candle.time as Time, value: candle.close })));
+        } else {
+            priceSeries.setData(chartCandles);
+        }
+        if (openPriceLine !== null) {
+            priceSeries.createPriceLine({
+                price: openPriceLine,
+                color: '#94a3b8',
+                lineWidth: 1,
+                lineStyle: LineStyle.Dashed,
+                axisLabelVisible: true,
+                title: 'Açılış',
+            });
+        }
         const volumeSeries = chart.addSeries(HistogramSeries, {
             priceScaleId: 'volume',
             priceFormat: { type: 'volume' },
@@ -104,7 +166,7 @@ export default function DynamicChart({
         });
         const positionAlertHandles = () => {
             alertHandles.forEach((button, id) => {
-                const coordinate = candleSeries.priceToCoordinate(alertPrices.get(id) ?? 0);
+                const coordinate = priceSeries.priceToCoordinate(alertPrices.get(id) ?? 0);
                 if (coordinate === null) {
                     button.hidden = true;
                     return;
@@ -133,6 +195,7 @@ export default function DynamicChart({
                 width: container.clientWidth,
                 height: container.clientHeight || 420,
             });
+            chart.timeScale().applyOptions({ rightOffset: container.clientWidth <= 600 ? 2 : 8 });
             positionAlertHandles();
         });
         resizeObserver.observe(container);
@@ -157,7 +220,7 @@ export default function DynamicChart({
         const onPointerMove = (event: PointerEvent) => {
             if (!draggingAlertId) return;
             const bounds = container.getBoundingClientRect();
-            const price = candleSeries.coordinateToPrice(event.clientY - bounds.top);
+            const price = priceSeries.coordinateToPrice(event.clientY - bounds.top);
             if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) return;
             draggedPrice = price;
             alertPrices.set(draggingAlertId, price);
@@ -221,13 +284,19 @@ export default function DynamicChart({
             container.style.position = originalPosition;
             chartRef.current = null;
         };
-    }, [candles, currentPrice, drawings, indicators, onAlertPriceChange, priceAlerts, theme]);
+    }, [candles, chartType, currentPrice, drawings, indicators, onAlertPriceChange, priceAlerts, symbol, theme, timeframe]);
 
     return (
         <section className="panel chart-panel">
             <div className="panel-heading">
                 <div><span className="eyebrow">FİYAT HAREKETİ · {timeframe}</span><h2>{symbol} / BIST</h2></div>
-                <span className="chart-state">{drawings.length ? `${drawings.length} AI seviyesi` : 'Hareketli ortalamalar'} · Veri çekildi {fetchedAt ? new Date(fetchedAt).toLocaleString('tr-TR') : 'bekleniyor'}</span>
+                <div className="chart-heading-meta">
+                    {onChartTypeChange && <div className="stock-chart-type-switch" role="group" aria-label="Grafik türü">
+                        <button type="button" className={chartType === 'candles' ? 'active' : ''} aria-label="Mum grafiği" title="Mum grafiği" aria-pressed={chartType === 'candles'} onClick={() => onChartTypeChange('candles')}>Mum</button>
+                        <button type="button" className={chartType === 'line' ? 'active' : ''} aria-label="Çizgi grafiği" title="Çizgi grafiği" aria-pressed={chartType === 'line'} onClick={() => onChartTypeChange('line')}>Çizgi</button>
+                    </div>}
+                    <span className="chart-state">{drawings.length ? `${drawings.length} AI seviyesi` : 'Hareketli ortalamalar'} · Veri çekildi {fetchedAt ? new Date(fetchedAt).toLocaleString('tr-TR') : 'bekleniyor'}</span>
+                </div>
             </div>
             <div ref={containerRef} className="chart-canvas" />
         </section>

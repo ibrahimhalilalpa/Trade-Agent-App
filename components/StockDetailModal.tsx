@@ -17,10 +17,18 @@ interface StockDetailModalProps {
 }
 
 const PERIODS: Array<{ id: Timeframe; label: string }> = [
-    { id: '1m', label: '1 dk' }, { id: '5m', label: '5 dk' }, { id: '15m', label: '15 dk' },
-    { id: '30m', label: '30 dk' }, { id: '1h', label: '1 saat' }, { id: '3h', label: '3 saat' },
-    { id: '6h', label: '6 saat' }, { id: '1d', label: 'Günlük' }, { id: '1wk', label: 'Haftalık' },
-    { id: '1mo', label: 'Aylık' }, { id: '1y', label: '1 yıl' }, { id: '5y', label: '5 yıl' },
+    { id: '1m', label: '1 dk' },
+    { id: '5m', label: '5 dk' },
+    { id: '15m', label: '15 dk' },
+    { id: '30m', label: '30 dk' },
+    { id: '1h', label: '1 saat' },
+    { id: '3h', label: '3 saat' },
+    { id: '6h', label: '6 saat' },
+    { id: '1d', label: '1 Gün' },
+    { id: '1wk', label: '1 Hafta' },
+    { id: '1mo', label: '1 Ay' },
+    { id: '1y', label: '1 Yıl' },
+    { id: '5y', label: '5 Yıl' },
 ];
 function orderEventLabel(eventType: NonNullable<PortfolioState['orderEvents']>[number]['eventType']): string {
     if (eventType === 'created') return 'OLUŞTU';
@@ -72,6 +80,7 @@ export default function StockDetailModal({ symbol, onClose, onAnalyze }: StockDe
     const [loading, setLoading] = useState(false);
     const [profileError, setProfileError] = useState('');
     const [timeframe, setTimeframe] = useState<Timeframe>('1d');
+    const [chartType, setChartType] = useState<'candles' | 'line'>('candles');
     const [market, setMarket] = useState<MarketData | null>(null);
     const [chartLoading, setChartLoading] = useState(false);
     const [chartError, setChartError] = useState('');
@@ -174,6 +183,7 @@ export default function StockDetailModal({ symbol, onClose, onAnalyze }: StockDe
             if (!active) return;
             setMarket(null);
             setTimeframe('1d');
+            setChartType('candles');
             setPortfolio(null);
             setPortfolioError('');
             setOrderMessage('');
@@ -590,7 +600,8 @@ export default function StockDetailModal({ symbol, onClose, onAnalyze }: StockDe
         ['Temettü verimi', profile.dividendYield == null ? 'Veri yok' : `%${(profile.dividendYield * 100).toFixed(2)}`],
     ] : [];
 
-    return createPortal(<div className="modal-backdrop" role="presentation" onClick={onClose}>
+    return createPortal(<div className="ds-shell stock-detail-portal">
+        <div className="modal-backdrop" role="presentation" onClick={onClose}>
         <section className="stock-modal stock-research-modal" role="dialog" aria-modal="true" aria-label={`${symbol} şirket detayları`} onClick={(event) => event.stopPropagation()}>
             <button className="modal-close" title="Kapat" onClick={onClose}><X size={18} /></button>
             {loading && <div className="modal-loading">Şirket profili yükleniyor...</div>}
@@ -615,14 +626,14 @@ export default function StockDetailModal({ symbol, onClose, onAnalyze }: StockDe
                 <section className="stock-chart-section">
                     <div className="stock-section-heading"><div><span className="eyebrow">CANLI GRAFİK</span><h3>Fiyat hareketi</h3></div><span className="stock-chart-status"><i className={market?.source === 'yahoo-finance' ? 'source-live' : ''} />{chartLoading ? 'Güncelleniyor' : market?.source === 'yahoo-finance' ? 'Sağlayıcı verisi' : market ? 'Yedek / sentetik veri' : 'Veri bekleniyor'}</span></div>
                     <div className="stock-period-controls">
-                        <label htmlFor="stock-chart-period">Grafik dönemi</label>
+                        <label htmlFor="stock-chart-period">Görünüm</label>
                         <select id="stock-chart-period" value={timeframe} onChange={(event) => setTimeframe(event.target.value as Timeframe)}>
                             {PERIODS.map((period) => <option key={period.id} value={period.id}>{period.label}</option>)}
                         </select>
                         <button className="stock-chart-refresh" onClick={() => setChartRefreshToken((token) => token + 1)} title="Grafik verisini yenile"><RefreshCw size={13} /> Yenile</button>
                     </div>
                     {market?.candles.length ? <DynamicChart
-                        symbol={symbol} timeframe={timeframe} candles={market.candles} indicators={EMPTY_INDICATORS}
+                        symbol={symbol} timeframe={timeframe} chartType={chartType} onChartTypeChange={setChartType} candles={market.candles} indicators={EMPTY_INDICATORS}
                         fetchedAt={chartUpdated || market.fetchedAt}
                         currentPrice={market.price}
                         priceAlerts={chartPriceAlerts}
@@ -813,5 +824,6 @@ export default function StockDetailModal({ symbol, onClose, onAnalyze }: StockDe
                 </div>
             </>}
         </section>
+        </div>
     </div>, document.body);
 }

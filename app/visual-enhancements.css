@@ -772,14 +772,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan) !important
 @media (max-width: 600px) {
   .portfolio-page-heading { align-items: flex-start; flex-direction: column; }
   .portfolio-reset-button { align-self: flex-end; }
-  .ds-shell .stock-research-modal { width: calc(100vw - 16px); max-height: 94vh; padding: 16px 12px;     .portfolio-pending-orders article { grid-template-columns: minmax(0, 1fr) auto; }
-    .portfolio-pending-orders article > span { grid-column: 1 / -1; }
-    .stock-pending-orders > div { grid-template-columns: minmax(0, 1fr) auto; }
-    .stock-pending-orders > div > span:nth-child(2) { grid-column: 1 / -1; }
-  }
+  .ds-shell .stock-research-modal { width: calc(100vw - 16px); max-height: 94vh; padding: 16px 12px; }
+  .portfolio-pending-orders article { grid-template-columns: minmax(0, 1fr) auto; }
+  .portfolio-pending-orders article > span { grid-column: 1 / -1; }
+  .stock-pending-orders > div { grid-template-columns: minmax(0, 1fr) auto; }
+  .stock-pending-orders > div > span:nth-child(2) { grid-column: 1 / -1; }
   .ds-shell .stock-research-modal .modal-header { padding-right: 28px; }
   .stock-chart-section, .stock-portfolio-section { padding: 12px; }
-  .ds-shell .stock-research-modal .chart-canvas { height: 250px; }
   .stock-order-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stock-order-actions { grid-column: 1 / -1; }
   .stock-order-actions button { flex: 1; }
@@ -807,6 +806,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan) !important
   .stock-alert-events > article { grid-template-columns: minmax(0, 1fr); }
 }
 
+.stock-detail-portal { display: contents; }
 .ds-shell .modal-backdrop {
   position: fixed;
   z-index: 1200;
@@ -876,6 +876,25 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan) !important
   font-size: 10px;
   white-space: nowrap;
 }
+.chart-heading-meta { display: grid; justify-items: end; gap: 2px; min-width: 0; }
+.stock-chart-type-switch { display: inline-flex; align-items: center; gap: 1px; }
+.stock-chart-type-switch button {
+  min-height: 22px;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 8px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.stock-chart-type-switch button.active {
+  border-radius: 4px;
+  background: rgba(148, 163, 184, .1);
+  color: #cbd5e1;
+}
+.stock-chart-type-switch button:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
 .stock-disclosure {
   overflow: hidden;
   border: 1px solid #1e293b;
@@ -927,6 +946,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--cyan) !important
   .ds-shell .stock-research-modal .modal-header h2 { font-size: 20px; }
   .ds-shell .stock-research-modal .company-facts,
   .ds-shell .stock-research-modal .stock-disclosure .company-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ds-shell .stock-research-modal .chart-panel .panel-heading { align-items: flex-start; }
+  .ds-shell .stock-research-modal .chart-heading-meta { display: flex; flex: 0 0 auto; }
+  .ds-shell .stock-research-modal .chart-state { display: none; }
+  .ds-shell .stock-research-modal .stock-chart-section { margin-right: -12px; margin-left: -12px; padding: 12px 4px; }
+  .ds-shell .stock-research-modal .chart-canvas { height: 360px; }
   .stock-period-controls { grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
   .stock-period-controls label { grid-column: 1 / -1; }
   .stock-period-controls select { grid-column: 1; }
@@ -3169,4 +3193,20 @@ html { overflow-x: clip; }
   .journal-filter-tabs button { flex: 1; justify-content: center; gap: 5px; padding-inline: 5px; font-size: 9px; }
   .journal-search { flex: 1 1 100%; }
   .journal-search input { flex: 1; width: 100%; }
+}
+
+@media (min-width: 761px) and (max-width: 1040px) {
+  .global-nav-frame .app-nav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36px;
+    grid-template-rows: 36px 37px;
+  }
+  .global-nav-frame .app-nav-brand { grid-column: 1; grid-row: 1; }
+  .global-nav-frame .app-nav .mobile-menu-toggle { grid-column: 2; grid-row: 1; }
+  .global-nav-frame .app-nav > .nav-search-wrap {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+  }
 }

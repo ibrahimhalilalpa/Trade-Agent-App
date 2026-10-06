@@ -10,9 +10,9 @@ const PERIODS: Record<string, { range: string; interval: Timeframe; bucketHours?
     '1h': { range: '6mo', interval: '1h' },
     '3h': { range: '2y', interval: '1h', bucketHours: 3 },
     '6h': { range: '2y', interval: '1h', bucketHours: 6 },
-    '1d': { range: '1y', interval: '1d' },
-    '1wk': { range: '5y', interval: '1wk' },
-    '1mo': { range: '10y', interval: '1mo' },
+    '1d': { range: '1d', interval: '5m' },
+    '1wk': { range: '5d', interval: '30m' },
+    '1mo': { range: '1mo', interval: '1h' },
     '1y': { range: '1y', interval: '1d' },
     '5y': { range: '5y', interval: '1wk' },
 };
